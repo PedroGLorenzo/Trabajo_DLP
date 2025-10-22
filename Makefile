@@ -1,6 +1,13 @@
 
-all: lambda parser lexer main
+BUILD_DIR := build
+.PHONY: all clean build_dir
+
+build_dir:
+	mkdir $(BUILD_DIR)
+
+all: build_dir lambda parser lexer main
 	ocamlc -o top lambda.cmo parser.cmo lexer.cmo main.cmo
+	mv top lexer.ml parser.mli parser.ml *.cmi *.cmo $(BUILD_DIR)
 
 lambda: lambda.ml lambda.mli
 	ocamlc -c lambda.mli lambda.ml
@@ -17,5 +24,4 @@ main: main.ml
 	ocamlc -c main.ml
 
 clean:
-	rm -f lexer.ml parser.mli parser.ml *.cmi *.cmo *~
-
+	rm -rf $(BUILD_DIR)

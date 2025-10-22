@@ -1,0 +1,6 @@
+# OCaml compiled artifacts
+*.cmi
+*.cmo
+
+# Build directories (dune / ocamlbuild)
+_build/
