@@ -4,6 +4,7 @@
 type ty =
     TyBool
   | TyNat
+  | TyString
   | TyArr of ty * ty
 ;;
 
@@ -24,6 +25,8 @@ type term =
   | TmApp of term * term
   | TmLetIn of string * term * term
   | TmFix of term
+  | TmString of string
+  | TmConcat of term * term
 ;;
 
 
@@ -128,6 +131,17 @@ let rec typeof ctx tm = match tm with
              if tyT11 = tyT12 then tyT12
              else raise (Type_error "result of body not compatible with domain")
          | _ -> raise (Type_error "arrow type expected"))
+  
+    (* T-String *)
+  | TmString _ ->
+      TyString
+
+    (* T-Concat *)
+  | TmConcat (t1, t2) ->
+      if typeof ctx t1 = TyString && typeof ctx t2 = TyString then
+        TyString
+      else
+        raise (Type_error "arguments of concat must be strings")
 ;;
 
 
@@ -144,6 +158,10 @@ let rec string_of_term = function
       " else " ^ "(" ^ string_of_term t3 ^ ")"
   | TmZero ->
       "0"
+  | TmString s ->
+      "\"" ^ s ^ "\""
+  | TmConcat (t1, t2) ->
+      "concat " ^ "(" ^ string_of_term t1 ^ ", " ^ string_of_term t2 ^ ")"
   | TmSucc t ->
      let rec f n t' = match t' with
           TmZero -> string_of_int n
@@ -254,6 +272,7 @@ let rec isval tm = match tm with
     TmTrue  -> true
   | TmFalse -> true
   | TmAbs _ -> true
+  | TmString _ -> true
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -337,7 +356,21 @@ let rec eval1 tm = match tm with
   | TmFix t1 ->
       let t1' = eval1 t1 in
       TmFix t1'
-      
+  
+    (* E-Concat1 *)
+  | TmConcat (t1, t2) when not (isval t1) ->
+      let t1' = eval1 t1 in
+      TmConcat (t1', t2)
+  
+    (* E-Concat2 *)
+  | TmConcat (v1, t2) when isval v1 && not (isval t2) ->
+      let t2' = eval1 t2 in
+      TmConcat (v1, t2')
+
+      (* E-ConcatStrings *)
+  | TmConcat (TmString s1, TmString s2) ->
+      TmString (s1 ^ s2)
+  
   | _ ->
       raise NoRuleApplies
 ;;

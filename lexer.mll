@@ -27,6 +27,10 @@ rule token = parse
   | '='         { EQ }
   | ':'         { COLON }
   | "->"        { ARROW }
+  | "^"         { CONCAT }
+  | '"' [^ '"']* '"' 
+                { STRINGV (String.sub (Lexing.lexeme lexbuf) 1 
+                  (String.length (Lexing.lexeme lexbuf) - 2)) }
   | ['0'-'9']+  { INTV (int_of_string (Lexing.lexeme lexbuf)) }
   | ['a'-'z']['a'-'z' '_' '0'-'9']*
                 { IDV (Lexing.lexeme lexbuf) }
