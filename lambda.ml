@@ -67,6 +67,15 @@ let getvbinding ctx s =
     | _ -> raise Not_found
 ;;
 
+let gettbinding ctx s =
+  match List.assoc s ctx with
+      TyBind ty -> ty
+    | TyTmBind (ty, _) -> ty
+
+let getvbinding ctx s =
+  match List.assoc s ctx with
+      TyTmBind (_, tm) -> tm
+    | _ -> raise Not_found
 
 (* TYPE MANAGEMENT (TYPING) *)
 
@@ -393,6 +402,8 @@ let apply_ctx ctx tm =
 
 let rec eval ctx tm =
   try
+    let tm' = eval1 ctx tm in
+    eval ctx tm'
     let tm' = eval1 ctx tm in
     eval ctx tm'
   with
