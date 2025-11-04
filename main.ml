@@ -31,10 +31,8 @@ let top_level_loop () =
   print_endline "Evaluator of lambda expressions...";
   let rec loop ctx =
     try
-      let tm = s token (from_string (read_command ())) in
-      let tyTm = typeof ctx tm in
-      print_endline (string_of_term (eval tm) ^ " : " ^ string_of_ty tyTm);
-      loop ctx
+      let c = s token (Lexing.from_string (read_command ())) in
+      loop (execute_command ctx c)
     with
        Lexical_error ->
          print_endline "lexical error";
