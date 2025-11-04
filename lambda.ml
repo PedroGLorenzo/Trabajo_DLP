@@ -261,7 +261,7 @@ let rec isval tm = match tm with
 exception NoRuleApplies
 ;;
 
-let rec eval1 tm = match tm with
+let rec eval1 ctx tm = match tm with
     (* E-IfTrue *)
     TmIf (TmTrue, t2, _) ->
       t2
@@ -272,12 +272,12 @@ let rec eval1 tm = match tm with
 
     (* E-If *)
   | TmIf (t1, t2, t3) ->
-      let t1' = eval1 t1 in
+      let t1' = eval1 ctx t1 in
       TmIf (t1', t2, t3)
 
     (* E-Succ *)
   | TmSucc t1 ->
-      let t1' = eval1 t1 in
+      let t1' = eval1 ctx t1 in
       TmSucc t1'
 
     (* E-PredZero *)
@@ -290,7 +290,7 @@ let rec eval1 tm = match tm with
 
     (* E-Pred *)
   | TmPred t1 ->
-      let t1' = eval1 t1 in
+      let t1' = eval1 ctx t1 in
       TmPred t1'
 
     (* E-IszeroZero *)
@@ -303,7 +303,7 @@ let rec eval1 tm = match tm with
 
     (* E-Iszero *)
   | TmIsZero t1 ->
-      let t1' = eval1 t1 in
+      let t1' = eval1 ctx t1 in
       TmIsZero t1'
 
     (* E-AppAbs *)
@@ -312,12 +312,12 @@ let rec eval1 tm = match tm with
 
     (* E-App2: evaluate argument before applying function *)
   | TmApp (v1, t2) when isval v1 ->
-      let t2' = eval1 t2 in
+      let t2' = eval1 ctx t2 in
       TmApp (v1, t2')
 
     (* E-App1: evaluate function before argument *)
   | TmApp (t1, t2) ->
-      let t1' = eval1 t1 in
+      let t1' = eval1 ctx t1 in
       TmApp (t1', t2)
 
     (* E-LetV *)
@@ -326,7 +326,7 @@ let rec eval1 tm = match tm with
 
     (* E-Let *)
   | TmLetIn(x, t1, t2) ->
-      let t1' = eval1 t1 in
+      let t1' = eval1 ctx t1 in
       TmLetIn (x, t1', t2)
 
     (* E-FixBeta *)
@@ -335,17 +335,20 @@ let rec eval1 tm = match tm with
 
     (* E-Fix *)
   | TmFix t1 ->
-      let t1' = eval1 t1 in
+      let t1' = eval1 ctx t1 in
       TmFix t1'
-      
+
+  | TmVar s ->
+      getvbinding ctx s 
+
   | _ ->
       raise NoRuleApplies
 ;;
 
-let rec eval tm =
+let rec eval ctx tm =
   try
-    let tm' = eval1 tm in
-    eval tm'
+    let tm' = eval1 ctx tm in
+    eval ctx tm'
   with
     NoRuleApplies -> tm
 ;;
