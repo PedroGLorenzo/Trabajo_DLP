@@ -25,8 +25,10 @@ type term =
 ;;
 
 val emptyctx : context;;
-val addbinding : context -> string -> ty -> context;;
-val getbinding : context -> string -> ty;;
+val addtbinding : context -> string -> ty -> context;;
+val addvbinding : context -> string -> term -> context;;
+val gettbinding : context -> string -> ty;;
+val getvbinding : context -> string -> term;;
 
 val string_of_ty : ty -> string;;
 exception Type_error of string;;

@@ -33,14 +33,23 @@ let emptyctx =
   []
 ;;
 
-let addbinding ctx x bind =
+let addtbinding ctx x bind =
   (x, bind) :: ctx
 ;;
 
-let getbinding ctx x =
+let gettbinding ctx x =
   List.assoc x ctx
 ;;
 
+let gettbinding ctx s =
+  match List.assoc s ctx with
+      TyBind ty -> ty
+    | TyTmBind (ty, _) -> ty
+
+let getvbinding ctx s =
+  match List.assoc s ctx with
+      TyTmBind (_, tm) -> tm
+    | _ -> raise Not_found
 
 (* TYPE MANAGEMENT (TYPING) *)
 
@@ -353,6 +362,10 @@ let rec eval ctx tm =
     NoRuleApplies -> tm
 ;;
 
+let apply_ctx ctx tm =
+  List.fold_left (fun t s -> subst (fst s) (getvbinding ctx (fst s)) t) tm ctx
+;;
+
 let execute ctx = function
     Eval tm ->
       let tyTm = typeof ctx tm in
@@ -361,7 +374,7 @@ let execute ctx = function
       ctx
   | Bind (s, tm) ->
       let tyTm = typeof ctx tm in
-      let tm' º= eval ctx tm in
+      let tm' = eval ctx tm in
       print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
       addvbinding ctx s tyTm tm'
   | Quit ->
