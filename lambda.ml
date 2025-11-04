@@ -353,3 +353,16 @@ let rec eval ctx tm =
     NoRuleApplies -> tm
 ;;
 
+let execute ctx = function
+    Eval tm ->
+      let tyTm = typeof ctx tm in
+      let tm' = eval ctx tm in
+      print_endline (string_of_ty tyTm' ^ " = " ^ string_of_term tm');
+      ctx
+  | Bind (s, tm) ->
+      let tyTm = typeof ctx tm in
+      let tm' º= eval ctx tm in
+      print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
+      addvbinding ctx s tyTm tm'
+  | Quit ->
+      raise End_of_file
