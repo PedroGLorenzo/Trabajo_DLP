@@ -13,6 +13,8 @@ type token =
   | IN
   | BOOL
   | NAT
+  | STRING
+  | QUIT
   | LPAREN
   | RPAREN
   | DOT
@@ -24,4 +26,4 @@ type token =
   | IDV of (string)
 
 val s :
-  (Lexing.lexbuf  -> token) -> Lexing.lexbuf -> Lambda.term
+  (Lexing.lexbuf  -> token) -> Lexing.lexbuf -> Lambda.command
