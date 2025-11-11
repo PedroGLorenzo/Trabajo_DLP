@@ -30,8 +30,9 @@ rule token = parse
   | ':'         { COLON }
   | "->"        { ARROW }
   | '^'         { CONCAT }
-  | '"' [^ '"']* '"'  { STRINGV (let str = Lexing.lexeme lexbuf in 
-                        String.sub str 1 (String.length str - 2)) }
+  | '"' [^'"']* '"' 
+                { STRINGV (String.sub (Lexing.lexeme lexbuf) 1 
+                  (String.length (Lexing.lexeme lexbuf) - 2)) }
   | ['0'-'9']+  { INTV (int_of_string (Lexing.lexeme lexbuf)) }
   | ['a'-'z']['a'-'z' '_' '0'-'9']*
                 { IDV (Lexing.lexeme lexbuf) }
