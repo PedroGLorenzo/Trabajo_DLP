@@ -68,45 +68,82 @@ let rec string_of_ty ty = match ty with
 exception Type_error of string;;
 
 let rec typeof ctx tm = match tm with
-  | TmTrue -> TyBool
-  | TmFalse -> TyBool
-  | TmIf (t1,t2,t3) ->
-      (match typeof ctx t1 with
-       | TyBool ->
-           let ty2 = typeof ctx t2 in
-           let ty3 = typeof ctx t3 in
-           if ty2 = ty3 then ty2 else raise (Type_error "branches differ")
-       | _ -> raise (Type_error "if condition not Bool"))
-  | TmZero -> TyNat
-  | TmSucc t | TmPred t ->
-      (match typeof ctx t with
-       | TyNat -> TyNat
-       | _ -> raise (Type_error "succ/pred arg not Nat"))
-  | TmIsZero t ->
-      (match typeof ctx t with
-       | TyNat -> TyBool
-       | _ -> raise (Type_error "iszero arg not Nat"))
+    (* T-True *)
+    TmTrue ->
+      TyBool
+
+    (* T-False *)
+  | TmFalse ->
+      TyBool
+
+    (* T-If *)
+  | TmIf (t1, t2, t3) ->
+      if typeof ctx t1 = TyBool then
+        let tyT2 = typeof ctx t2 in
+        if typeof ctx t3 = tyT2 then tyT2
+        else raise (Type_error "arms of conditional have different types")
+      else
+        raise (Type_error "guard of conditional not a boolean")
+
+    (* T-Zero *)
+  | TmZero ->
+      TyNat
+
+    (* T-Succ *)
+  | TmSucc t1 ->
+      if typeof ctx t1 = TyNat then TyNat
+      else raise (Type_error "argument of succ is not a number")
+
+    (* T-Pred *)
+  | TmPred t1 ->
+      if typeof ctx t1 = TyNat then TyNat
+      else raise (Type_error "argument of pred is not a number")
+
+    (* T-Iszero *)
+  | TmIsZero t1 ->
+      if typeof ctx t1 = TyNat then TyBool
+      else raise (Type_error "argument of iszero is not a number")
+
+    (* T-Var *)
   | TmVar x ->
-      gettbinding ctx x
-  | TmAbs (x, tyX, t) ->
-      let ctx' = addtbinding ctx x tyX in
-      let tyT = typeof ctx' t in
-      TyArr (tyX, tyT)
-  | TmApp (t1,t2) ->
-      (match typeof ctx t1 with
-       | TyArr (tyA, tyB) ->
-           let ty2 = typeof ctx t2 in
-           if ty2 = tyA then tyB else raise (Type_error "arg type mismatch")
-       | _ -> raise (Type_error "apply non-function"))
+      (try gettbinding ctx x with
+       _ -> raise (Type_error ("no binding type for variable " ^ x)))
+
+    (* T-Abs *)
+  | TmAbs (x, tyT1, t2) ->
+      let ctx' = addtbinding ctx x tyT1 in
+      let tyT2 = typeof ctx' t2 in
+      TyArr (tyT1, tyT2)
+
+    (* T-App *)
+  | TmApp (t1, t2) ->
+      let tyT1 = typeof ctx t1 in
+      let tyT2 = typeof ctx t2 in
+      (match tyT1 with
+           TyArr (tyT11, tyT12) ->
+             if tyT2 = tyT11 then tyT12
+             else raise (Type_error "parameter type mismatch")
+         | _ -> raise (Type_error "arrow type expected"))
+
+    (* T-Let *)
   | TmLetIn (x, t1, t2) ->
-      let ty1 = typeof ctx t1 in
-      let ctx' = addtbinding ctx x ty1 in
+      let tyT1 = typeof ctx t1 in
+      let ctx' = addtbinding ctx x tyT1 in
       typeof ctx' t2
-  | TmFix t ->
-      (match typeof ctx t with
-       | TyArr (tyA, tyB) when tyA = tyB -> tyA
-       | _ -> raise (Type_error "fix expects ty->ty"))
-  | TmString _ -> TyString
+
+    (* T-Fix *)
+  | TmFix t1 ->
+      let tyT1 = typeof ctx t1 in
+      (match tyT1 with
+           TyArr (tyT11, tyT12) ->
+             if tyT11 = tyT12 then tyT12
+             else raise (Type_error "result of body not compatible with domain")
+         | _ -> raise (Type_error "arrow type expected"))
+
+    (* T-String *)
+  | TmString _ ->
+      TyString
+
   | TmConcat (t1,t2) ->
       let ty1 = typeof ctx t1 in
       let ty2 = typeof ctx t2 in
@@ -114,127 +151,243 @@ let rec typeof ctx tm = match tm with
       else raise (Type_error "++ operands must be String")
 ;;
 
+;;
+
+
 (* TERMS MANAGEMENT (EVALUATION) *)
 
 let rec string_of_term = function
-  | TmTrue -> "true"
-  | TmFalse -> "false"
-  | TmIf (a,b,c) ->
-      "if " ^ string_of_term a ^ " then " ^ string_of_term b ^
-      " else " ^ string_of_term c
-  | TmZero -> "0"
+    TmTrue ->
+      "true"
+  | TmFalse ->
+      "false"
+  | TmIf (t1,t2,t3) ->
+      "if " ^ "(" ^ string_of_term t1 ^ ")" ^
+      " then " ^ "(" ^ string_of_term t2 ^ ")" ^
+      " else " ^ "(" ^ string_of_term t3 ^ ")"
+  | TmZero ->
+      "0"
   | TmSucc t ->
-      let rec count n = function
-        | TmZero -> string_of_int n
-        | TmSucc t' -> count (n+1) t'
-        | _ -> "succ(" ^ string_of_term t ^ ")"
-      in count 1 t
-  | TmPred t -> "pred(" ^ string_of_term t ^ ")"
-  | TmIsZero t -> "iszero(" ^ string_of_term t ^ ")"
-  | TmVar x -> x
-  | TmAbs (x, tyX, t) ->
-      "lambda " ^ x ^ ":" ^ string_of_ty tyX ^ ". " ^ string_of_term t
-  | TmApp (t1,t2) ->
+     let rec f n t' = match t' with
+          TmZero -> string_of_int n
+        | TmSucc s -> f (n+1) s
+        | _ -> "succ " ^ "(" ^ string_of_term t ^ ")"
+      in f 1 t
+  | TmPred t ->
+      "pred " ^ "(" ^ string_of_term t ^ ")"
+  | TmIsZero t ->
+      "iszero " ^ "(" ^ string_of_term t ^ ")"
+  | TmVar s ->
+      s
+  | TmAbs (s, tyS, t) ->
+      "(lambda " ^ s ^ ":" ^ string_of_ty tyS ^ ". " ^ string_of_term t ^ ")"
+  | TmApp (t1, t2) ->
       "(" ^ string_of_term t1 ^ " " ^ string_of_term t2 ^ ")"
-  | TmLetIn (x,t1,t2) ->
-      "let " ^ x ^ " = " ^ string_of_term t1 ^ " in " ^ string_of_term t2
-  | TmFix t -> "fix(" ^ string_of_term t ^ ")"
-  | TmString s -> "\"" ^ s ^ "\""
+  | TmLetIn (s, t1, t2) ->
+      "let " ^ s ^ " = " ^ string_of_term t1 ^ " in " ^ string_of_term t2
+  | TmFix t ->
+      "(fix " ^ string_of_term t ^ ")"
+  | TmString s ->
+      "\"" ^ s ^ "\""
   | TmConcat (t1,t2) ->
       "(" ^ string_of_term t1 ^ " ^ " ^ string_of_term t2 ^ ")"
 ;;
 
 let rec ldif l1 l2 = match l1 with
-  | h::t -> if List.mem h l2 then ldif t l2 else h :: ldif t l2
-  | [] -> []
+    [] -> []
+  | h::t -> if List.mem h l2 then ldif t l2 else h::(ldif t l2)
 ;;
 
 let rec lunion l1 l2 = match l1 with
-  | h::t -> if List.mem h l2 then lunion t l2 else h :: lunion t l2
-  | [] -> l2
+    [] -> l2
+  | h::t -> if List.mem h l2 then lunion t l2 else h::(lunion t l2)
 ;;
 
 let rec free_vars tm = match tm with
-  | TmTrue | TmFalse | TmZero | TmString _ -> []
-  | TmSucc t | TmPred t | TmIsZero t | TmFix t -> free_vars t
-  | TmIf (a,b,c) -> lunion (free_vars a) (lunion (free_vars b) (free_vars c))
-  | TmVar x -> [x]
-  | TmAbs (x, _, t) -> ldif (free_vars t) [x]
-  | TmApp (t1,t2) -> lunion (free_vars t1) (free_vars t2)
-  | TmLetIn (x,t1,t2) -> lunion (free_vars t1) (ldif (free_vars t2) [x])
-  | TmConcat (t1,t2) -> lunion (free_vars t1) (free_vars t2)
+    TmTrue ->
+      []
+  | TmFalse ->
+      []
+  | TmIf (t1, t2, t3) ->
+      lunion (lunion (free_vars t1) (free_vars t2)) (free_vars t3)
+  | TmZero ->
+      []
+  | TmSucc t ->
+      free_vars t
+  | TmPred t ->
+      free_vars t
+  | TmIsZero t ->
+      free_vars t
+  | TmVar s ->
+      [s]
+  | TmAbs (s, _, t) ->
+      ldif (free_vars t) [s]
+  | TmApp (t1, t2) ->
+      lunion (free_vars t1) (free_vars t2)
+  | TmLetIn (s, t1, t2) ->
+      lunion (ldif (free_vars t2) [s]) (free_vars t1)
+  | TmFix t ->
+      free_vars t
+  | TmString _ ->
+      []
 ;;
 
 let rec fresh_name x l =
   if not (List.mem x l) then x else fresh_name (x ^ "'") l
 ;;
 
-let rec subst x s tm =
-  let r = subst x s in
-  match tm with
-  | TmTrue | TmFalse | TmZero | TmString _ -> tm
-  | TmVar y -> if y = x then s else tm
-  | TmSucc t -> TmSucc (r t)
-  | TmPred t -> TmPred (r t)
-  | TmIsZero t -> TmIsZero (r t)
-  | TmIf (a,b,c) -> TmIf (r a, r b, r c)
+let rec subst x s tm = match tm with
+    TmTrue ->
+      TmTrue
+  | TmFalse ->
+      TmFalse
+  | TmIf (t1, t2, t3) ->
+      TmIf (subst x s t1, subst x s t2, subst x s t3)
+  | TmZero ->
+      TmZero
+  | TmSucc t ->
+      TmSucc (subst x s t)
+  | TmPred t ->
+      TmPred (subst x s t)
+  | TmIsZero t ->
+      TmIsZero (subst x s t)
+  | TmVar y ->
+      if y = x then s else tm
   | TmAbs (y, tyY, t) ->
       if y = x then tm
-      else if not (List.mem y (free_vars s)) then TmAbs (y, tyY, r t)
-      else
-        let y' = fresh_name y (lunion (free_vars t) (free_vars s)) in
-        TmAbs (y', tyY, r (subst y (TmVar y') t))
-  | TmApp (t1,t2) -> TmApp (r t1, r t2)
-  | TmLetIn (y,t1,t2) ->
-      let t1' = r t1 in
-      if y = x then TmLetIn (y, t1', t2)
-      else if not (List.mem y (free_vars s)) then TmLetIn (y, t1', r t2)
-      else
-        let y' = fresh_name y (lunion (free_vars t2) (free_vars s)) in
-        let t2' = subst y (TmVar y') t2 in
-        TmLetIn (y', t1', r t2')
-  | TmFix t -> TmFix (r t)
-  | TmConcat (t1,t2) -> TmConcat (r t1, r t2)
+      else let fvs = free_vars s in
+           if not (List.mem y fvs)
+           then TmAbs (y, tyY, subst x s t)
+           else let z = fresh_name y (free_vars t @ fvs) in
+                TmAbs (z, tyY, subst x s (subst y (TmVar z) t))
+  | TmApp (t1, t2) ->
+      TmApp (subst x s t1, subst x s t2)
+  | TmLetIn (y, t1, t2) ->
+      if y = x then TmLetIn (y, subst x s t1, t2)
+      else let fvs = free_vars s in
+           if not (List.mem y fvs)
+           then TmLetIn (y, subst x s t1, subst x s t2)
+           else let z = fresh_name y (free_vars t2 @ fvs) in
+                TmLetIn (z, subst x s t1, subst x s (subst y (TmVar z) t2))
+  | TmFix t1 ->
+      TmFix (subst x s t1)
+  | TmString tm ->
+      TmString tm
+  | TmConcat (t1,t2) ->
+      TmConcat (subst x s t1, subst x s t2)
 ;;
 
 let rec isnumericval tm = match tm with
-  | TmZero -> true
+    TmZero -> true
   | TmSucc t -> isnumericval t
   | _ -> false
 ;;
 
 let rec isval tm = match tm with
-  | TmTrue | TmFalse -> true
+    TmTrue  -> true
+  | TmFalse -> true
   | TmAbs _ -> true
   | TmString _ -> true
   | t when isnumericval t -> true
   | _ -> false
 ;;
 
-exception NoRuleApplies;;
+exception NoRuleApplies
+;;
 
 let rec eval1 ctx tm = match tm with
-  | TmIf (TmTrue, t2, _) -> t2
-  | TmIf (TmFalse, _, t3) -> t3
-  | TmIf (t1,t2,t3) -> TmIf (eval1 ctx t1, t2, t3)
-  | TmSucc t when not (isval t) -> TmSucc (eval1 ctx t)
-  | TmPred TmZero -> TmZero
-  | TmPred (TmSucc nv) when isnumericval nv -> nv
-  | TmPred t -> TmPred (eval1 ctx t)
-  | TmIsZero TmZero -> TmTrue
-  | TmIsZero (TmSucc nv) when isnumericval nv -> TmFalse
-  | TmIsZero t -> TmIsZero (eval1 ctx t)
-  | TmApp (TmAbs (x,_,t12), v2) when isval v2 -> subst x v2 t12
-  | TmApp (v1, t2) when isval v1 -> TmApp (v1, eval1 ctx t2)
-  | TmApp (t1, t2) -> TmApp (eval1 ctx t1, t2)
-  | TmLetIn (x, v1, t2) when isval v1 -> subst x v1 t2
-  | TmLetIn (x, t1, t2) -> TmLetIn (x, eval1 ctx t1, t2)
-  | TmFix (TmAbs (x,ty,t)) -> subst x (TmFix (TmAbs (x,ty,t))) t
-  | TmFix t -> TmFix (eval1 ctx t)
-  | TmConcat (t1,t2) when not (isval t1) -> TmConcat (eval1 ctx t1, t2)
-  | TmConcat (v1,t2) when isval v1 && not (isval t2) -> TmConcat (v1, eval1 ctx t2)
-  | TmConcat (TmString s1, TmString s2) -> TmString (s1 ^ s2)
-  | _ -> raise NoRuleApplies
+    (* E-IfTrue *)
+    TmIf (TmTrue, t2, _) ->
+      t2
+
+    (* E-IfFalse *)
+  | TmIf (TmFalse, _, t3) ->
+      t3
+
+    (* E-If *)
+  | TmIf (t1, t2, t3) ->
+      let t1' = eval1 ctx t1 in
+      TmIf (t1', t2, t3)
+
+    (* E-Succ *)
+  | TmSucc t1 ->
+      let t1' = eval1 ctx t1 in
+      TmSucc t1'
+
+    (* E-PredZero *)
+  | TmPred TmZero ->
+      TmZero
+
+    (* E-PredSucc *)
+  | TmPred (TmSucc nv1) when isnumericval nv1 ->
+      nv1
+
+    (* E-Pred *)
+  | TmPred t1 ->
+      let t1' = eval1 ctx t1 in
+      TmPred t1'
+
+    (* E-IszeroZero *)
+  | TmIsZero TmZero ->
+      TmTrue
+
+    (* E-IszeroSucc *)
+  | TmIsZero (TmSucc nv1) when isnumericval nv1 ->
+      TmFalse
+
+    (* E-Iszero *)
+  | TmIsZero t1 ->
+      let t1' = eval1 ctx t1 in
+      TmIsZero t1'
+
+    (* E-AppAbs *)
+  | TmApp (TmAbs(x, _, t12), v2) when isval v2 ->
+      subst x v2 t12
+
+    (* E-App2: evaluate argument before applying function *)
+  | TmApp (v1, t2) when isval v1 ->
+      let t2' = eval1 ctx t2 in
+      TmApp (v1, t2')
+
+    (* E-App1: evaluate function before argument *)
+  | TmApp (t1, t2) ->
+      let t1' = eval1 ctx t1 in
+      TmApp (t1', t2)
+
+    (* E-LetV *)
+  | TmLetIn (x, v1, t2) when isval v1 ->
+      subst x v1 t2
+
+    (* E-Let *)
+  | TmLetIn(x, t1, t2) ->
+      let t1' = eval1 ctx t1 in
+      TmLetIn (x, t1', t2)
+
+    (* E-FixBeta *)
+  | TmFix (TmAbs (x, _, t2)) ->
+      subst x tm t2
+
+    (* E-Fix *)
+  | TmFix t1 ->
+      let t1' = eval1 ctx t1 in
+      TmFix t1'
+
+  | TmConcat (TmString s1, TmString s2) ->
+      TmString (s1 ^ s2)
+
+  | TmConcat (TmString s1, t2) ->
+      let t2' = eval1 ctx t2 in
+      TmConcat (TmString s1, t2')
+
+  | TmConcat (t1, t2) ->
+      let t1' = eval1 ctx t1 in
+      TmConcat (t1', t2)
+  
+  | TmVar s ->
+      getvbinding ctx s
+      
+  | _ ->
+      raise NoRuleApplies
 ;;
 
 let apply_ctx ctx tm =
@@ -242,21 +395,25 @@ let apply_ctx ctx tm =
 ;;
 
 let rec eval ctx tm =
-  try let tm' = eval1 ctx tm in eval ctx tm'
-  with NoRuleApplies -> tm
+  try
+    let tm' = eval1 ctx tm in
+    eval ctx tm'
+  with
+    NoRuleApplies -> apply_ctx ctx tm
 ;;
 
 let execute ctx = function
-  | Eval tm ->
-      let ty = typeof ctx tm in
-      let v = eval ctx tm in
-      Printf.printf "%s : %s\n" (string_of_term v) (string_of_ty ty);
+    Eval tm ->
+      let tyTm = typeof ctx tm in
+      let tm' = eval ctx tm in
+      print_endline ("- : " ^ string_of_term tm' ^ " : " ^ string_of_ty tyTm);
       ctx
-  | Bind (x, tm) ->
-      let ty = typeof ctx tm in
-      let v = eval ctx tm in
-      Printf.printf "%s = %s : %s\n" x (string_of_term v) (string_of_ty ty);
-      addvbinding (addtbinding ctx x ty) x ty v
+
+  | Bind (s, tm) ->
+      let tyTm = typeof ctx tm in
+      let tm' = eval ctx tm in
+      print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
+      addvbinding ctx s tyTm tm'
+
   | Quit ->
-      Printf.printf "Bye.\n"; ctx
-;;
+      raise End_of_file
