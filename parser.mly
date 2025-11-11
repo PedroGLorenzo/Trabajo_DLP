@@ -79,7 +79,7 @@ atomicTerm :
             { TmTrue }
     |   FALSE
             { TmFalse }
-    |   STRINGV s
+    |   STRINGV
             { TmString $1 }
     |   IDV
             { TmVar $1 }
@@ -102,4 +102,6 @@ atomicTy :
             { TyBool }
     |   NAT
             { TyNat }
+    |   STRING
+            { TyString }
 
