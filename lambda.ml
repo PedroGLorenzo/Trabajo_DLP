@@ -165,6 +165,10 @@ let rec typeof ctx tm = match tm with
              if tyT11 = tyT12 then tyT12
              else raise (Type_error "result of body not compatible with domain")
          | _ -> raise (Type_error "arrow type expected"))
+
+    (* T-String *)
+  | TmString _ ->
+      TyString
 ;;
 
 
@@ -201,6 +205,8 @@ let rec string_of_term = function
       "let " ^ s ^ " = " ^ string_of_term t1 ^ " in " ^ string_of_term t2
   | TmFix t ->
       "(fix " ^ string_of_term t ^ ")"
+  | TmString s ->
+      "\"" ^ s ^ "\""
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -238,6 +244,8 @@ let rec free_vars tm = match tm with
       lunion (ldif (free_vars t2) [s]) (free_vars t1)
   | TmFix t ->
       free_vars t
+  | TmString _ ->
+      []
 ;;
 
 let rec fresh_name x l =
@@ -279,6 +287,8 @@ let rec subst x s tm = match tm with
                 TmLetIn (z, subst x s t1, subst x s (subst y (TmVar z) t2))
   | TmFix t1 ->
       TmFix (subst x s t1)
+  | TmString str ->
+      TmString str
 ;;
 
 let rec isnumericval tm = match tm with
@@ -291,6 +301,7 @@ let rec isval tm = match tm with
     TmTrue  -> true
   | TmFalse -> true
   | TmAbs _ -> true
+  | TmString _ -> true
   | t when isnumericval t -> true
   | _ -> false
 ;;
