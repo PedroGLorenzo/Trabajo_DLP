@@ -3,4 +3,4 @@
 *.cmo
 
 # Build directories (dune / ocamlbuild)
-_build/
+build/
