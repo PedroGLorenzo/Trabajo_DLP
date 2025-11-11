@@ -230,6 +230,8 @@ let rec free_vars tm = match tm with
       free_vars t
   | TmString _ ->
       []
+  | TmConcat (t1,t2) ->
+      lunion (free_vars t1) (free_vars t2)
 ;;
 
 let rec fresh_name x l =
