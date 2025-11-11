@@ -21,9 +21,11 @@ type token =
   | EQ
   | COLON
   | ARROW
+  | CONCAT
   | EOF
   | INTV of (int)
   | IDV of (string)
+  | STRINGV of (string)
 
 val s :
   (Lexing.lexbuf  -> token) -> Lexing.lexbuf -> Lambda.command

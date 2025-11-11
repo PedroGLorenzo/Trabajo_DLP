@@ -404,8 +404,6 @@ let rec eval ctx tm =
   try
     let tm' = eval1 ctx tm in
     eval ctx tm'
-    let tm' = eval1 ctx tm in
-    eval ctx tm'
   with
     NoRuleApplies -> apply_ctx ctx tm
 ;;
