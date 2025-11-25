@@ -95,6 +95,8 @@ atomicTerm :
             in f $1 }
     |   LBRACE termlist RBRACE
             { TmTuple $2 }
+    |   LBRACE fieldlist RBRACE
+            { TmRcd $2 }
 
 ty :
         atomicTy
@@ -117,4 +119,10 @@ termlist :
             { [$1] }
     |   term COMMA termlist
             { $1 :: $3 }
+
+fieldlist :
+        IDV EQ term
+            { [($1, $3)] }
+    |   IDV EQ term COMMA fieldlist
+            { ($1, $3) :: $5 }
 

@@ -4,5 +4,4 @@
 
 # Build directories (dune / ocamlbuild)
 build/
-
 Makefile

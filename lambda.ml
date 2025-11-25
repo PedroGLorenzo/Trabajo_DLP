@@ -6,6 +6,7 @@ type ty =
   | TyArr of ty * ty
   | TyString
   | TyTuple of ty list
+  | TyRcd of (string * ty) list
 ;;
 
 type term =
@@ -24,6 +25,7 @@ type term =
   | TmString of string
   | TmConcat of term * term
   | TmTuple of term list
+  | TmRcd of (string * term) list
   | TmProj of term * int
 ;;
 
@@ -67,6 +69,7 @@ let rec string_of_ty ty = match ty with
   | TyString -> "String"
   | TyArr (t1,t2) -> "(" ^ string_of_ty t1 ^ "->" ^ string_of_ty t2 ^ ")"
   | TyTuple tys -> "{" ^ String.concat ", " (List.map string_of_ty tys) ^ "}"
+  | TyRcd fields -> "{" ^ String.concat ", " (List.map (fun (_, t) -> string_of_ty t) fields) ^ "}"
 ;;
 
 exception Type_error of string;;
@@ -148,15 +151,23 @@ let rec typeof ctx tm = match tm with
   | TmString _ ->
       TyString
 
+    (* T-Concat *)
   | TmConcat (t1,t2) ->
       let ty1 = typeof ctx t1 in
       let ty2 = typeof ctx t2 in
       if ty1 = TyString && ty2 = TyString then TyString
       else raise (Type_error "++ operands must be String")
 
+    (* T-Tuple *)
   | TmTuple ts ->
       TyTuple (List.map (typeof ctx) ts)
 
+    (* T-Rcd *)
+  | TmRcd fields ->
+      let field_types = List.map (fun (l, t) -> (l, typeof ctx t)) fields in
+      TyRcd field_types
+
+    (* T-Proj *)
   | TmProj (t, i) ->
       let tyT = typeof ctx t in
       (match tyT with
@@ -208,6 +219,8 @@ let rec string_of_term = function
       "(" ^ string_of_term t1 ^ " ^ " ^ string_of_term t2 ^ ")"
   | TmTuple ts ->
       "{" ^ String.concat ", " (List.map string_of_term ts) ^ "}"
+  | TmRcd fields ->
+      "{" ^ String.concat ", " (List.map (fun (l, t) -> l ^ " = " ^ string_of_term t) fields) ^ "}"
   | TmProj (t, i) ->
       string_of_term t ^ "." ^ string_of_int i
 ;;
@@ -253,6 +266,8 @@ let rec free_vars tm = match tm with
       lunion (free_vars t1) (free_vars t2)
   | TmTuple ts ->
       List.fold_left lunion [] (List.map free_vars ts)
+  | TmRcd fields ->
+      List.fold_left lunion [] (List.map (fun (_, t) -> free_vars t) fields)
   | TmProj (t, _) ->
       free_vars t
 ;;
@@ -302,6 +317,8 @@ let rec subst x s tm = match tm with
       TmConcat (subst x s t1, subst x s t2)
   | TmTuple ts ->
       TmTuple (List.map (subst x s) ts)
+  | TmRcd fields ->
+      TmRcd (List.map (fun (l, t) -> (l, subst x s t)) fields)
   | TmProj (t, i) ->
       TmProj (subst x s t, i)
 ;;
@@ -318,6 +335,7 @@ let rec isval tm = match tm with
   | TmAbs _ -> true
   | TmString _ -> true
   | TmTuple ts -> List.for_all isval ts
+  | TmRcd fields -> List.for_all (fun (_, t) -> isval t) fields
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -402,6 +420,7 @@ let rec eval1 ctx tm = match tm with
       let t1' = eval1 ctx t1 in
       TmFix t1'
 
+    (* E-ConcatString *)
   | TmConcat (TmString s1, TmString s2) ->
       TmString (s1 ^ s2)
 
@@ -413,12 +432,21 @@ let rec eval1 ctx tm = match tm with
       let t1' = eval1 ctx t1 in
       TmConcat (t1', t2)
 
+    (* E-Tuple *)
   | TmTuple ts ->
       let rec eval_tuple = function
           [] -> []
-        | t::ts -> if isval t then t :: eval_tuple ts else (eval1 ctx t) :: ts
+        | t::ts -> (eval1 ctx t) :: ts
       in TmTuple (eval_tuple ts)
 
+      (*E-Rcd*)
+  | TmRcd fields ->
+      let rec eval_fields = function
+          [] -> []
+        | (l, t)::fields -> (l, eval1 ctx t) :: fields
+      in TmRcd (eval_fields fields)
+
+    (* E-ProjTuple *)
   | TmProj (TmTuple ts, i) when List.for_all isval ts ->
       if i >= 1 && i <= List.length ts then List.nth ts (i-1)
       else raise NoRuleApplies  (* or error, but since typed, shouldn't happen *)
