@@ -26,6 +26,9 @@
 %token EQ
 %token COLON
 %token ARROW
+%token LBRACE
+%token RBRACE
+%token COMMA
 %token CONCAT
 %token EOF
 
@@ -71,6 +74,8 @@ appTerm :
             { TmIsZero $2 }
     |   appTerm atomicTerm
             { TmApp ($1, $2) }
+    |   appTerm DOT INTV
+            { TmProj ($1, $3) }
 
 atomicTerm :
         LPAREN term RPAREN
@@ -88,6 +93,8 @@ atomicTerm :
                     0 -> TmZero
                 |   n -> TmSucc (f (n-1))
             in f $1 }
+    |   LBRACE termlist RBRACE
+            { TmTuple $2 }
 
 ty :
         atomicTy
@@ -104,4 +111,10 @@ atomicTy :
             { TyNat }
     |   STRING
             { TyString }
+
+termlist :
+        term
+            { [$1] }
+    |   term COMMA termlist
+            { $1 :: $3 }
 

@@ -5,6 +5,7 @@ type ty =
   | TyNat
   | TyArr of ty * ty
   | TyString
+  | TyTuple of ty list
 ;;
 
 type term =
@@ -22,6 +23,8 @@ type term =
   | TmFix of term
   | TmString of string
   | TmConcat of term * term
+  | TmTuple of term list
+  | TmProj of term * int
 ;;
 
 type command =
@@ -63,6 +66,7 @@ let rec string_of_ty ty = match ty with
   | TyNat -> "Nat"
   | TyString -> "String"
   | TyArr (t1,t2) -> "(" ^ string_of_ty t1 ^ "->" ^ string_of_ty t2 ^ ")"
+  | TyTuple tys -> "{" ^ String.concat ", " (List.map string_of_ty tys) ^ "}"
 ;;
 
 exception Type_error of string;;
@@ -149,6 +153,17 @@ let rec typeof ctx tm = match tm with
       let ty2 = typeof ctx t2 in
       if ty1 = TyString && ty2 = TyString then TyString
       else raise (Type_error "++ operands must be String")
+
+  | TmTuple ts ->
+      TyTuple (List.map (typeof ctx) ts)
+
+  | TmProj (t, i) ->
+      let tyT = typeof ctx t in
+      (match tyT with
+         TyTuple tys ->
+           if i >= 1 && i <= List.length tys then List.nth tys (i-1)
+           else raise (Type_error ("projection index " ^ string_of_int i ^ " out of bounds"))
+       | _ -> raise (Type_error "projection of non-tuple"))
 ;;
 
 ;;
@@ -191,6 +206,10 @@ let rec string_of_term = function
       "\"" ^ s ^ "\""
   | TmConcat (t1,t2) ->
       "(" ^ string_of_term t1 ^ " ^ " ^ string_of_term t2 ^ ")"
+  | TmTuple ts ->
+      "{" ^ String.concat ", " (List.map string_of_term ts) ^ "}"
+  | TmProj (t, i) ->
+      string_of_term t ^ "." ^ string_of_int i
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -232,6 +251,10 @@ let rec free_vars tm = match tm with
       []
   | TmConcat (t1,t2) ->
       lunion (free_vars t1) (free_vars t2)
+  | TmTuple ts ->
+      List.fold_left lunion [] (List.map free_vars ts)
+  | TmProj (t, _) ->
+      free_vars t
 ;;
 
 let rec fresh_name x l =
@@ -277,6 +300,10 @@ let rec subst x s tm = match tm with
       TmString tm
   | TmConcat (t1,t2) ->
       TmConcat (subst x s t1, subst x s t2)
+  | TmTuple ts ->
+      TmTuple (List.map (subst x s) ts)
+  | TmProj (t, i) ->
+      TmProj (subst x s t, i)
 ;;
 
 let rec isnumericval tm = match tm with
@@ -290,6 +317,7 @@ let rec isval tm = match tm with
   | TmFalse -> true
   | TmAbs _ -> true
   | TmString _ -> true
+  | TmTuple ts -> List.for_all isval ts
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -384,10 +412,24 @@ let rec eval1 ctx tm = match tm with
   | TmConcat (t1, t2) ->
       let t1' = eval1 ctx t1 in
       TmConcat (t1', t2)
-  
+
+  | TmTuple ts ->
+      let rec eval_tuple = function
+          [] -> []
+        | t::ts -> if isval t then t :: eval_tuple ts else (eval1 ctx t) :: ts
+      in TmTuple (eval_tuple ts)
+
+  | TmProj (TmTuple ts, i) when List.for_all isval ts ->
+      if i >= 1 && i <= List.length ts then List.nth ts (i-1)
+      else raise NoRuleApplies  (* or error, but since typed, shouldn't happen *)
+
+  | TmProj (t, i) ->
+      let t' = eval1 ctx t in
+      TmProj (t', i)
+
   | TmVar s ->
       getvbinding ctx s
-      
+
   | _ ->
       raise NoRuleApplies
 ;;
