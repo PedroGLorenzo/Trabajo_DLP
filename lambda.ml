@@ -6,6 +6,7 @@ type ty =
   | TyArr of ty * ty
   | TyString
   | TyTuple of ty list
+  | TyList of ty
   | TyRcd of (string * ty) list
 ;;
 
@@ -69,6 +70,7 @@ let rec string_of_ty ty = match ty with
   | TyString -> "String"
   | TyArr (t1,t2) -> "(" ^ string_of_ty t1 ^ "->" ^ string_of_ty t2 ^ ")"
   | TyTuple tys -> "{" ^ String.concat ", " (List.map string_of_ty tys) ^ "}"
+  | TyList t -> "[" ^ string_of_ty t ^ "]"
   | TyRcd fields -> "{" ^ String.concat ", " (List.map (fun (_, t) -> string_of_ty t) fields) ^ "}"
 ;;
 
@@ -175,6 +177,7 @@ let rec typeof ctx tm = match tm with
            if i >= 1 && i <= List.length tys then List.nth tys (i-1)
            else raise (Type_error ("projection index " ^ string_of_int i ^ " out of bounds"))
        | _ -> raise (Type_error "projection of non-tuple"))
+      
 ;;
 
 ;;

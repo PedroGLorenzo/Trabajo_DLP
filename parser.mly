@@ -32,6 +32,11 @@
 %token CONCAT
 %token EOF
 
+%token LIST
+%token LBRACKET
+%token RBRACKET
+%token SEMICOLON
+
 %token <int> INTV
 %token <string> IDV
 %token <string> STRINGV

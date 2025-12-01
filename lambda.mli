@@ -5,6 +5,7 @@ type ty =
   | TyArr of ty * ty
   | TyString
   | TyTuple of ty list
+  | TyList of ty
   | TyRcd of (string * ty) list
 ;;
 

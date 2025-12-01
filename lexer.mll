@@ -35,6 +35,9 @@ rule token = parse
                   (String.length (Lexing.lexeme lexbuf) - 2)) }
   | '{'         { LBRACE }
   | '}'         { RBRACE }
+  | '['         { LBRACKET }
+  | ']'         { RBRACKET }
+  | ';'         { SEMICOLON }
   | ','         { COMMA }
   | ['0'-'9']+  { INTV (int_of_string (Lexing.lexeme lexbuf)) }
   | ['a'-'z']['a'-'z' '_' '0'-'9']*
