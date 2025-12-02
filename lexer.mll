@@ -28,15 +28,22 @@ rule token = parse
   | "String"    { STRING }
   | "List"      { LIST }
   | "quit"      { QUIT }
+  | "as"        { AS }
+  | "case"      { CASE }
+  | "of"        { OF }
+  | "=>"        { EQARROW }
+  | "->"        { ARROW }
   | '('         { LPAREN }
   | ')'         { RPAREN }
+  | '<'         { LANGLE }
+  | '>'         { RANGLE }
   | '.'         { DOT }
   | '='         { EQ }
   | ':'         { COLON }
-  | "->"        { ARROW }
   | '^'         { CONCAT }
-  | '"' [^'"']* '"' 
-                { STRINGV (String.sub (Lexing.lexeme lexbuf) 1 
+  | '|'         { BAR }
+  | '"' [^'"']* '"'
+                { STRINGV (String.sub (Lexing.lexeme lexbuf) 1
                   (String.length (Lexing.lexeme lexbuf) - 2)) }
   | '{'         { LBRACE }
   | '}'         { RBRACE }
@@ -45,7 +52,7 @@ rule token = parse
   | ';'         { SEMICOLON }
   | ','         { COMMA }
   | ['0'-'9']+  { INTV (int_of_string (Lexing.lexeme lexbuf)) }
-  | ['a'-'z']['a'-'z' '_' '0'-'9']*
+  | ['A'-'Z''a'-'z']['a'-'z' '_' '0'-'9']*
                 { IDV (Lexing.lexeme lexbuf) }
   | eof         { EOF }
   | _           { raise Lexical_error }
