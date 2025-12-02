@@ -26,10 +26,25 @@ letrec sum: Nat -> Nat -> Nat =
             succ( sum( pred n) m)
 in sum 21 34
 
-{true, 0, "hello"}
-let t = {true, 0, "hello"} in t.1
-let t = {true, 0, "hello"} in t.2
-{ name = "Alice", age = 30 }
-let r = { name = "Alice", age = 30 } in r.name
-let r = { name = "Alice", age = 30 } in r.age
-let t = {true, 0, "hello"} in t.3
+t = {true, 0, "hello"}
+t.1
+t.2
+
+r = { name = "Alice", age = 30 }
+r.name
+r.age
+
+Int = <pos:Nat, zero:Bool, neg:Nat>
+p3 = <pos=3> as Int
+p0 = <zero=true> as Int
+n2 = <neg=2> as Int
+
+abs = lambda i : Int.
+case i of
+<pos=p> => (<pos=p> as Int)
+| <zero=z> => (<zero=true> as Int)
+| <neg=n> => (<pos=n> as Int)
+
+abs p3
+abs p0
+abs n2

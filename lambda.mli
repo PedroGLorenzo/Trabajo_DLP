@@ -1,12 +1,13 @@
-
 type ty =
-    TyBool
-  | TyNat
-  | TyArr of ty * ty
-  | TyString
-  | TyTuple of ty list
-  | TyList of ty
-  | TyRcd of (string * ty) list
+     TyBool
+   | TyNat
+   | TyArr of ty * ty
+   | TyString
+   | TyTuple of ty list
+   | TyList of ty
+   | TyRcd of (string * ty) list
+   | TyVariant of (string * ty) list
+   | TyName of string
 ;;
 
 type term =
@@ -28,21 +29,25 @@ type term =
    | TmRcd of (string * term) list
    | TmProj of term * int
    | TmProjRcd of term * string
+   | TmVariant of string * term
+   | TmAs of term * ty
+   | TmCase of term * (string * string * term) list
 ;;
 
 type command =
-    Eval of term
-  | Bind of string * term
-  | Quit
+     Eval of term
+   | Bind of string * term
+   | TypeBind of string * ty
+   | Quit
 ;;
 
 type binding =
-  TyBind of ty
-  | TyTmBind of (ty * term)
+   TyBind of ty
+ | TyTmBind of (ty * term)
 ;;
 
 type context =
-  (string * binding) list
+   (string * binding) list
 ;;
 
 val emptyctx : context;;
@@ -60,4 +65,3 @@ exception NoRuleApplies;;
 val eval : context -> term -> term;;
 
 val execute : context -> command -> context;;
-
