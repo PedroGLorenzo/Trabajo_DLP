@@ -37,6 +37,12 @@
 %token RBRACKET
 %token SEMICOLON
 
+%token HEAD
+%token TAIL
+%token NIL
+%token ISNIL
+%token CONS
+
 %token <int> INTV
 %token <string> IDV
 %token <string> STRINGV
@@ -77,6 +83,14 @@ appTerm :
              { TmPred $2 }
      |   ISZERO atomicTerm
              { TmIsZero $2 }
+     |   HEAD atomicTerm
+             { TmHead $2 }
+     |   TAIL atomicTerm
+             { TmTail $2 }
+     |   ISNIL atomicTerm
+             { TmIsNil $2 }
+     |   CONS atomicTerm atomicTerm
+             { TmCons ($2, $3) }
      |   appTerm atomicTerm
              { TmApp ($1, $2) }
      |   appTerm DOT INTV
@@ -100,8 +114,12 @@ atomicTerm :
                     0 -> TmZero
                 |   n -> TmSucc (f (n-1))
             in f $1 }
-    |   LBRACE termlist RBRACE
+    |   LBRACE termtuple RBRACE
             { TmTuple $2 }
+    |   LBRACKET RBRACKET
+            { TmNil TyNat }
+    |   LBRACKET termlist RBRACKET
+            { $2 }
     |   LBRACE fieldlist RBRACE
             { TmRcd $2 }
 
@@ -120,11 +138,13 @@ atomicTy :
             { TyNat }
     |   STRING
             { TyString }
+    |   LBRACKET ty RBRACKET
+            { TyList $2 }
 
-termlist :
+termtuple :
         term
             { [$1] }
-    |   term COMMA termlist
+    |   term COMMA termtuple
             { $1 :: $3 }
 
 fieldlist :
@@ -132,4 +152,10 @@ fieldlist :
             { [($1, $3)] }
     |   IDV EQ term COMMA fieldlist
             { ($1, $3) :: $5 }
+
+termlist :
+        term
+            { TmCons ($1, TmNil TyNat) }
+    |   term COMMA termlist
+            { TmCons ($1, $3) }
 

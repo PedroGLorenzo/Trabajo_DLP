@@ -16,12 +16,17 @@ rule token = parse
   | "succ"      { SUCC }
   | "pred"      { PRED }
   | "iszero"    { ISZERO }
+  | "head"      { HEAD }
+  | "tail"      { TAIL }
+  | "isnil"     { ISNIL }
+  | "cons"      { CONS }
   | "let"       { LET }
   | "letrec"    { LETREC }
   | "in"        { IN }
   | "Bool"      { BOOL }
   | "Nat"       { NAT }
   | "String"    { STRING }
+  | "List"      { LIST }
   | "quit"      { QUIT }
   | '('         { LPAREN }
   | ')'         { RPAREN }

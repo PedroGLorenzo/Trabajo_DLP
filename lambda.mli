@@ -10,24 +10,29 @@ type ty =
 ;;
 
 type term =
-     TmTrue
-   | TmFalse
-   | TmIf of term * term * term
-   | TmZero
-   | TmSucc of term
-   | TmPred of term
-   | TmIsZero of term
-   | TmVar of string
-   | TmAbs of string * ty * term
-   | TmApp of term * term
-   | TmLetIn of string * term * term
-   | TmFix of term
-   | TmString of string
-   | TmConcat of term * term
-   | TmTuple of term list
-   | TmRcd of (string * term) list
-   | TmProj of term * int
-   | TmProjRcd of term * string
+    TmTrue
+    | TmFalse
+    | TmIf of term * term * term
+    | TmZero
+    | TmSucc of term
+    | TmPred of term
+    | TmIsZero of term
+    | TmVar of string
+    | TmAbs of string * ty * term
+    | TmApp of term * term
+    | TmLetIn of string * term * term
+    | TmFix of term
+    | TmString of string
+    | TmConcat of term * term
+    | TmTuple of term list
+    | TmRcd of (string * term) list    
+    | TmProj of term * int
+    | TmProjRcd of term * string
+    | TmNil of ty
+    | TmCons of term * term
+    | TmHead of term
+    | TmTail of term
+    | TmIsNil of term
 ;;
 
 type command =

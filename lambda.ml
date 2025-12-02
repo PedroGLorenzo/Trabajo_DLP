@@ -11,24 +11,29 @@ type ty =
 ;;
 
 type term =
-     TmTrue
-   | TmFalse
-   | TmIf of term * term * term
-   | TmZero
-   | TmSucc of term
-   | TmPred of term
-   | TmIsZero of term
-   | TmVar of string
-   | TmAbs of string * ty * term
-   | TmApp of term * term
-   | TmLetIn of string * term * term
-   | TmFix of term
-   | TmString of string
-   | TmConcat of term * term
-   | TmTuple of term list
-   | TmRcd of (string * term) list
-   | TmProj of term * int
-   | TmProjRcd of term * string
+    TmTrue
+  | TmFalse
+  | TmIf of term * term * term
+  | TmZero
+  | TmSucc of term
+  | TmPred of term
+  | TmIsZero of term
+  | TmVar of string
+  | TmAbs of string * ty * term
+  | TmApp of term * term
+  | TmLetIn of string * term * term
+  | TmFix of term
+  | TmString of string
+  | TmConcat of term * term
+  | TmTuple of term list
+  | TmRcd of (string * term) list
+  | TmProj of term * int
+  | TmProjRcd of term * string
+  | TmNil of ty
+  | TmCons of term * term
+  | TmHead of term
+  | TmTail of term
+  | TmIsNil of term
 ;;
 
 type command =
@@ -188,6 +193,35 @@ let rec typeof ctx tm = match tm with
             Not_found -> raise (Type_error ("field " ^ l ^ " not found in record")))
        | _ -> raise (Type_error "projection of non-record"))
 
+  
+  (* T-Cons: construct a list by consing head and tail *)
+  | TmCons (h, t) ->
+      let tyH = typeof ctx h in
+      (match t with
+         TmNil ty -> TyList tyH
+       | _ -> let tyT = typeof ctx t in
+              (match tyT with
+                 TyList ty when ty = tyH -> TyList ty
+               | _ -> raise (Type_error "type mismatch in cons")))
+
+  | TmHead t ->
+      (match typeof ctx t with
+         TyList ty -> ty
+       | _ -> raise (Type_error "attempted head operation applied to non-list"))
+
+  | TmTail t ->
+      (match typeof ctx t with
+         TyList ty -> TyList ty
+       | _ -> raise (Type_error "attempted tail operation applied to non-list"))
+  (* T-Nil: empty list literal (cannot infer on its own) *)
+  | TmNil ty ->
+      TyList ty
+
+  | TmIsNil t ->
+      (match typeof ctx t with
+         TyList _ -> TyBool
+       | _ -> raise (Type_error "attempted isnil operation applied to non-list"))
+
 ;;
 
 ;;
@@ -237,7 +271,22 @@ let rec string_of_term = function
   | TmProj (t, i) ->
       string_of_term t ^ "." ^ string_of_int i
   | TmProjRcd (t, l) ->
-      string_of_term t ^ "." ^ l
+    string_of_term t ^ "." ^ l
+  | TmNil _ ->
+    "[]"
+  | TmCons (t1, t2) ->
+    let rec collect acc = function
+      TmCons (h, tl) -> collect (acc @ [h]) tl
+    | TmNil _ -> acc
+    | other -> acc @ [other]
+    in
+    "[" ^ String.concat "; " (List.map string_of_term (collect [] (TmCons (t1, t2)))) ^ "]"
+  | TmHead t ->
+    "head " ^ string_of_term t
+  | TmTail t ->
+    "tail " ^ string_of_term t
+  | TmIsNil t ->
+    "isnil " ^ string_of_term t
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -287,6 +336,16 @@ let rec free_vars tm = match tm with
       free_vars t
   | TmProjRcd (t, _) ->
       free_vars t
+  | TmNil _ ->
+    []
+  | TmCons (h, t) ->
+    lunion (free_vars h) (free_vars t)
+  | TmHead t ->
+    free_vars t
+  | TmTail t ->
+    free_vars t
+  | TmIsNil t ->
+    free_vars t
 ;;
 
 let rec fresh_name x l =
@@ -340,6 +399,16 @@ let rec subst x s tm = match tm with
       TmProj (subst x s t, i)
   | TmProjRcd (t, l) ->
       TmProjRcd (subst x s t, l)
+  | TmNil ty ->
+    TmNil ty
+  | TmCons (h, t') ->
+    TmCons (subst x s h, subst x s t')
+  | TmHead t' ->
+    TmHead (subst x s t')
+  | TmTail t' ->
+    TmTail (subst x s t')
+  | TmIsNil t' ->
+    TmIsNil (subst x s t')
 ;;
 
 let rec isnumericval tm = match tm with
@@ -355,6 +424,8 @@ let rec isval tm = match tm with
   | TmString _ -> true
   | TmTuple ts -> List.for_all isval ts
   | TmRcd fields -> List.for_all (fun (_, t) -> isval t) fields
+  | TmNil _ -> true
+  | TmCons (h, t) -> isval h && isval t
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -481,6 +552,33 @@ let rec eval1 ctx tm = match tm with
   | TmProjRcd (t, l) ->
       let t' = eval1 ctx t in
       TmProjRcd (t', l)
+
+  | TmCons (t1, t2) ->
+    let t1' = eval1 ctx t1 in
+    TmCons (t1', t2)
+
+  | TmNil _ ->
+    raise NoRuleApplies
+
+  | TmHead (TmCons (v1, v2)) when isval v1 && isval v2 ->
+    v1
+  | TmHead t ->
+    let t' = eval1 ctx t in
+    TmHead t'
+
+  | TmTail (TmCons (v1, v2)) when isval v1 && isval v2 ->
+    v2
+  | TmTail t ->
+    let t' = eval1 ctx t in
+    TmTail t'
+
+  | TmIsNil (TmNil _) ->
+    TmTrue
+  | TmIsNil (TmCons (_, _)) ->
+    TmFalse
+  | TmIsNil t ->
+    let t' = eval1 ctx t in
+    TmIsNil t'
 
   | TmVar s ->
       getvbinding ctx s
