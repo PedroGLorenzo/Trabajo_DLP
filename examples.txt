@@ -29,4 +29,7 @@ in sum 21 34
 {true, 0, "hello"}
 let t = {true, 0, "hello"} in t.1
 let t = {true, 0, "hello"} in t.2
+{ name = "Alice", age = 30 }
+let r = { name = "Alice", age = 30 } in r.name
+let r = { name = "Alice", age = 30 } in r.age
 let t = {true, 0, "hello"} in t.3

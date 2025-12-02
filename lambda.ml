@@ -11,23 +11,24 @@ type ty =
 ;;
 
 type term =
-    TmTrue
-  | TmFalse
-  | TmIf of term * term * term
-  | TmZero
-  | TmSucc of term
-  | TmPred of term
-  | TmIsZero of term
-  | TmVar of string
-  | TmAbs of string * ty * term
-  | TmApp of term * term
-  | TmLetIn of string * term * term
-  | TmFix of term
-  | TmString of string
-  | TmConcat of term * term
-  | TmTuple of term list
-  | TmRcd of (string * term) list
-  | TmProj of term * int
+     TmTrue
+   | TmFalse
+   | TmIf of term * term * term
+   | TmZero
+   | TmSucc of term
+   | TmPred of term
+   | TmIsZero of term
+   | TmVar of string
+   | TmAbs of string * ty * term
+   | TmApp of term * term
+   | TmLetIn of string * term * term
+   | TmFix of term
+   | TmString of string
+   | TmConcat of term * term
+   | TmTuple of term list
+   | TmRcd of (string * term) list
+   | TmProj of term * int
+   | TmProjRcd of term * string
 ;;
 
 type command =
@@ -65,13 +66,13 @@ let getvbinding ctx s =
 (* TYPE MANAGEMENT (TYPING) *)
 
 let rec string_of_ty ty = match ty with
-  | TyBool -> "Bool"
-  | TyNat -> "Nat"
-  | TyString -> "String"
-  | TyArr (t1,t2) -> "(" ^ string_of_ty t1 ^ "->" ^ string_of_ty t2 ^ ")"
-  | TyTuple tys -> "{" ^ String.concat ", " (List.map string_of_ty tys) ^ "}"
-  | TyList t -> "[" ^ string_of_ty t ^ "]"
-  | TyRcd fields -> "{" ^ String.concat ", " (List.map (fun (_, t) -> string_of_ty t) fields) ^ "}"
+   | TyBool -> "Bool"
+   | TyNat -> "Nat"
+   | TyString -> "String"
+   | TyArr (t1,t2) -> "(" ^ string_of_ty t1 ^ "->" ^ string_of_ty t2 ^ ")"
+   | TyTuple tys -> "{" ^ String.concat ", " (List.map string_of_ty tys) ^ "}"
+   | TyList t -> "[" ^ string_of_ty t ^ "]"
+   | TyRcd fields -> "{" ^ String.concat ", " (List.map (fun (l, t) -> l ^ ":" ^ string_of_ty t) fields) ^ "}"
 ;;
 
 exception Type_error of string;;
@@ -177,7 +178,16 @@ let rec typeof ctx tm = match tm with
            if i >= 1 && i <= List.length tys then List.nth tys (i-1)
            else raise (Type_error ("projection index " ^ string_of_int i ^ " out of bounds"))
        | _ -> raise (Type_error "projection of non-tuple"))
-      
+
+    (* T-ProjRcd *)
+  | TmProjRcd (t, l) ->
+      let tyT = typeof ctx t in
+      (match tyT with
+         TyRcd fields ->
+           (try List.assoc l fields with
+            Not_found -> raise (Type_error ("field " ^ l ^ " not found in record")))
+       | _ -> raise (Type_error "projection of non-record"))
+
 ;;
 
 ;;
@@ -226,6 +236,8 @@ let rec string_of_term = function
       "{" ^ String.concat ", " (List.map (fun (l, t) -> l ^ " = " ^ string_of_term t) fields) ^ "}"
   | TmProj (t, i) ->
       string_of_term t ^ "." ^ string_of_int i
+  | TmProjRcd (t, l) ->
+      string_of_term t ^ "." ^ l
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -272,6 +284,8 @@ let rec free_vars tm = match tm with
   | TmRcd fields ->
       List.fold_left lunion [] (List.map (fun (_, t) -> free_vars t) fields)
   | TmProj (t, _) ->
+      free_vars t
+  | TmProjRcd (t, _) ->
       free_vars t
 ;;
 
@@ -324,6 +338,8 @@ let rec subst x s tm = match tm with
       TmRcd (List.map (fun (l, t) -> (l, subst x s t)) fields)
   | TmProj (t, i) ->
       TmProj (subst x s t, i)
+  | TmProjRcd (t, l) ->
+      TmProjRcd (subst x s t, l)
 ;;
 
 let rec isnumericval tm = match tm with
@@ -457,6 +473,14 @@ let rec eval1 ctx tm = match tm with
   | TmProj (t, i) ->
       let t' = eval1 ctx t in
       TmProj (t', i)
+
+    (* E-ProjRcd *)
+  | TmProjRcd (TmRcd fields, l) when List.for_all (fun (_, t) -> isval t) fields ->
+      (try List.assoc l fields with Not_found -> raise NoRuleApplies)
+
+  | TmProjRcd (t, l) ->
+      let t' = eval1 ctx t in
+      TmProjRcd (t', l)
 
   | TmVar s ->
       getvbinding ctx s

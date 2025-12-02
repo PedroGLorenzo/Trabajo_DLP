@@ -69,18 +69,20 @@ term :
             { TmLetIn ($2, TmFix (TmAbs ($2, $4, $6)), $8) }
 
 appTerm :
-        atomicTerm
-            { $1 }
-    |   SUCC atomicTerm
-            { TmSucc $2 }
-    |   PRED atomicTerm
-            { TmPred $2 }
-    |   ISZERO atomicTerm
-            { TmIsZero $2 }
-    |   appTerm atomicTerm
-            { TmApp ($1, $2) }
-    |   appTerm DOT INTV
-            { TmProj ($1, $3) }
+         atomicTerm
+             { $1 }
+     |   SUCC atomicTerm
+             { TmSucc $2 }
+     |   PRED atomicTerm
+             { TmPred $2 }
+     |   ISZERO atomicTerm
+             { TmIsZero $2 }
+     |   appTerm atomicTerm
+             { TmApp ($1, $2) }
+     |   appTerm DOT INTV
+             { TmProj ($1, $3) }
+     |   appTerm DOT IDV
+             { TmProjRcd ($1, $3) }
 
 atomicTerm :
         LPAREN term RPAREN
