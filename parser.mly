@@ -50,6 +50,10 @@
 %token ISNIL
 %token CONS
 
+%token LENGTH
+%token APPEND
+%token MAP
+
 %token <int> INTV
 %token <string> IDV
 %token <string> STRINGV
@@ -86,55 +90,61 @@ term :
              { TmCase ($2, $4) }
 
 appTerm :
-         atomicTerm
-             { $1 }
-     |   SUCC atomicTerm
-             { TmSucc $2 }
-     |   PRED atomicTerm
-             { TmPred $2 }
-     |   ISZERO atomicTerm
-             { TmIsZero $2 }
-     |   HEAD atomicTerm
-             { TmHead $2 }
-     |   TAIL atomicTerm
-             { TmTail $2 }
-     |   ISNIL atomicTerm
-             { TmIsNil $2 }
-     |   CONS atomicTerm atomicTerm
-             { TmCons ($2, $3) }
-     |   appTerm atomicTerm
-             { TmApp ($1, $2) }
-     |   appTerm DOT INTV
-             { TmProj ($1, $3) }
-     |   appTerm DOT IDV
-             { TmProjRcd ($1, $3) }
+        atomicTerm
+            { $1 }
+    |   SUCC atomicTerm
+            { TmSucc $2 }
+    |   PRED atomicTerm
+            { TmPred $2 }
+    |   ISZERO atomicTerm
+            { TmIsZero $2 }
+    |   HEAD atomicTerm
+            { TmHead $2 }
+    |   TAIL atomicTerm
+            { TmTail $2 }
+    |   ISNIL atomicTerm
+            { TmIsNil $2 }
+    |   CONS atomicTerm atomicTerm
+            { TmCons ($2, $3) }
+    |   LENGTH atomicTerm
+            { TmLength $2 }
+    |   APPEND atomicTerm atomicTerm
+            { TmAppend ($2, $3) }
+    |   MAP atomicTerm atomicTerm
+            { TmMap ($2, $3) }
+    |   appTerm atomicTerm
+            { TmApp ($1, $2) }
+    |   appTerm DOT INTV
+            { TmProj ($1, $3) }
+    |   appTerm DOT IDV
+            { TmProjRcd ($1, $3) }
 
 atomicTerm :
-         LPAREN term RPAREN
-             { $2 }
-     |   TRUE
-             { TmTrue }
-     |   FALSE
-             { TmFalse }
-     |   STRINGV
-             { TmString $1 }
-     |   IDV
-             { TmVar $1 }
-     |   INTV
-             { let rec f = function
-                     0 -> TmZero
-                 |   n -> TmSucc (f (n-1))
-             in f $1 }
-     |   LBRACE termtuple RBRACE
-             { TmTuple $2 }
+        LPAREN term RPAREN
+            { $2 }
+    |   TRUE
+            { TmTrue }
+    |   FALSE
+            { TmFalse }
+    |   STRINGV
+            { TmString $1 }
+    |   IDV
+            { TmVar $1 }
+    |   INTV
+            { let rec f = function
+                   0 -> TmZero
+                |   n -> TmSucc (f (n-1))
+            in f $1 }
+    |   LBRACE termtuple RBRACE
+            { TmTuple $2 }
     |   LBRACKET RBRACKET
             { TmNil TyNat }
     |   LBRACKET termlist RBRACKET
             { $2 }
-     |   LBRACE fieldlist RBRACE
-             { TmRcd $2 }
-     |   LANGLE IDV EQ term RANGLE AS ty
-             { TmAs (TmVariant ($2, $4), $7) }
+    |   LBRACE fieldlist RBRACE
+            { TmRcd $2 }
+    |   LANGLE IDV EQ term RANGLE AS ty
+            { TmAs (TmVariant ($2, $4), $7) }
 
 ty :
         atomicTy
@@ -145,17 +155,17 @@ ty :
 atomicTy :
          LPAREN ty RPAREN
              { $2 }
-     |   BOOL
+    |   BOOL
              { TyBool }
-     |   NAT
+    |   NAT
              { TyNat }
-     |   STRING
+    |   STRING
              { TyString }
     |   LBRACKET ty RBRACKET
             { TyList $2 }
-     |   LANGLE fieldlist_ty RANGLE
+    |   LANGLE fieldlist_ty RANGLE
              { TyVariant $2 }
-     |   IDV
+    |   IDV
              { TyName $1 }
 
 termtuple :
@@ -165,9 +175,9 @@ termtuple :
             { $1 :: $3 }
 
 fieldlist :
-         IDV EQ term
+        IDV EQ term
              { [($1, $3)] }
-     |   IDV EQ term COMMA fieldlist
+    |   IDV EQ term COMMA fieldlist
              { ($1, $3) :: $5 }
 
 termlist :
@@ -177,18 +187,18 @@ termlist :
             { TmCons ($1, $3) }
 
 fieldlist_ty :
-         IDV COLON ty
+        IDV COLON ty
              { [($1, $3)] }
-     |   IDV COLON ty COMMA fieldlist_ty
+    |   IDV COLON ty COMMA fieldlist_ty
              { ($1, $3) :: $5 }
 
 branches :
-         branch
+        branch
              { [$1] }
-     |   branch BAR branches
+    |   branch BAR branches
              { $1 :: $3 }
 
 branch :
-         LANGLE IDV EQ IDV RANGLE EQARROW term
-             { ($2, $4, $7) }
+        LANGLE IDV EQ IDV RANGLE EQARROW term
+            { ($2, $4, $7) }
 

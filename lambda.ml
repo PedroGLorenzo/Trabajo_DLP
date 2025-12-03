@@ -36,6 +36,9 @@ type term =
   | TmHead of term
   | TmTail of term
   | TmIsNil of term
+  | TmLength of term
+  | TmAppend of term * term
+  | TmMap of term * term
   | TmVariant of string * term
   | TmAs of term * ty
   | TmCase of term * (string * string * term) list
@@ -272,6 +275,18 @@ let rec typeof ctx tm = match tm with
       (match typeof ctx t with
          TyList _ -> TyBool
        | _ -> raise (Type_error "attempted isnil operation applied to non-list"))
+  | TmLength t ->
+      (match typeof ctx t with
+         TyList _ -> TyNat
+       | _ -> raise (Type_error "attempted length operation applied to non-list"))
+  | TmAppend (t1, t2) ->
+      (match typeof ctx t1, typeof ctx t2 with
+         TyList ty1, TyList ty2 when ty1 = ty2 -> TyList ty1
+       | _ -> raise (Type_error "type mismatch in append"))
+  | TmMap (t1, t2) ->
+      (match typeof ctx t1, typeof ctx t2 with
+         TyArr (tyA, tyB), TyList tyL when tyA = tyL -> TyList tyB
+       | _ -> raise (Type_error "type mismatch in map"))
 
 ;;
 
@@ -344,6 +359,12 @@ let rec string_of_term = function
     "tail " ^ string_of_term t
   | TmIsNil t ->
     "isnil " ^ string_of_term t
+  | TmLength t ->
+    "length " ^ string_of_term t
+  | TmAppend (t1, t2) ->
+    "append " ^ string_of_term t1 ^ " " ^ string_of_term t2
+  | TmMap (t1, t2) ->
+    "map " ^ string_of_term t1 ^ " " ^ string_of_term t2
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -403,6 +424,12 @@ let rec free_vars tm = match tm with
     free_vars t
   | TmIsNil t ->
     free_vars t
+  | TmLength t ->
+    free_vars t
+  | TmAppend (t1, t2) ->
+    lunion (free_vars t1) (free_vars t2)
+  | TmMap (t1, t2) ->
+    lunion (free_vars t1) (free_vars t2)
   | TmVariant (_, t) ->
     free_vars t
   | TmAs (t, _) ->
@@ -470,15 +497,21 @@ let rec subst x s tm = match tm with
    | TmCase (t, branches) ->
        TmCase (subst x s t, List.map (fun (c, y, body) -> (c, y, if y = x then body else subst x s body)) branches)
   | TmNil ty ->
-    TmNil ty
+      TmNil ty
   | TmCons (h, t') ->
-    TmCons (subst x s h, subst x s t')
+      TmCons (subst x s h, subst x s t')
   | TmHead t' ->
-    TmHead (subst x s t')
+      TmHead (subst x s t')
   | TmTail t' ->
-    TmTail (subst x s t')
+      TmTail (subst x s t')
   | TmIsNil t' ->
-    TmIsNil (subst x s t')
+      TmIsNil (subst x s t')
+  | TmLength t' ->
+      TmLength (subst x s t')
+  | TmAppend (t1, t2) ->
+      TmAppend (subst x s t1, subst x s t2)
+  | TmMap (t1, t2) ->
+      TmMap (subst x s t1, subst x s t2)
 ;;
 
 let rec isnumericval tm = match tm with
@@ -489,13 +522,13 @@ let rec isnumericval tm = match tm with
 
 let rec isval tm = match tm with
      TmTrue  -> true
-   | TmFalse -> true
-   | TmAbs _ -> true
-   | TmString _ -> true
-   | TmTuple ts -> List.for_all isval ts
-   | TmRcd fields -> List.for_all (fun (_, t) -> isval t) fields
-   | TmVariant (_, t) -> isval t
-   | TmNil _ -> true
+  | TmFalse -> true
+  | TmAbs _ -> true
+  | TmString _ -> true
+  | TmTuple ts -> List.for_all isval ts
+  | TmRcd fields -> List.for_all (fun (_, t) -> isval t) fields
+  | TmVariant (_, t) -> isval t
+  | TmNil _ -> true
   | TmCons (h, t) -> isval h && isval t
   | t when isnumericval t -> true
    | _ -> false
@@ -608,74 +641,112 @@ let rec eval1 ctx tm = match tm with
        in TmRcd (eval_fields fields)
 
      (* E-ProjTuple *)
-   | TmProj (TmTuple ts, i) when List.for_all isval ts ->
+   |    TmProj (TmTuple ts, i) when List.for_all isval ts ->
        if i >= 1 && i <= List.length ts then List.nth ts (i-1)
        else raise NoRuleApplies  (* or error, but since typed, shouldn't happen *)
 
-   | TmProj (t, i) ->
+    |    TmProj (t, i) ->
        let t' = eval1 ctx t in
        TmProj (t', i)
 
      (* E-ProjRcd *)
-   | TmProjRcd (TmRcd fields, l) when List.for_all (fun (_, t) -> isval t) fields ->
+    | TmProjRcd (TmRcd fields, l) when List.for_all (fun (_, t) -> isval t) fields ->
        (try List.assoc l fields with Not_found -> raise NoRuleApplies)
 
-   | TmProjRcd (t, l) ->
+    | TmProjRcd (t, l) ->
        let t' = eval1 ctx t in
        TmProjRcd (t', l)
 
      (* E-Variant *)
-   | TmVariant (c, t) ->
+    | TmVariant (c, t) ->
        let t' = eval1 ctx t in
        TmVariant (c, t')
 
-   | TmAs (TmVariant (c, v), ty) when isval v ->
+    | TmAs (TmVariant (c, v), ty) when isval v ->
        TmVariant (c, v)
 
-   | TmAs (t, ty) ->
+    | TmAs (t, ty) ->
        let t' = eval1 ctx t in
        TmAs (t', ty)
 
      (* E-CaseVariant *)
-   | TmCase (TmVariant (c, v), branches) when isval v ->
+    | TmCase (TmVariant (c, v), branches) when isval v ->
        (try let (_, x, body) = List.find (fun (c', _, _) -> c' = c) branches in
             subst x v body
         with Not_found -> raise NoRuleApplies)
 
-      (*E-Case*)
+       (*E-Case*)
    | TmCase (t, branches) ->
        let t' = eval1 ctx t in
        TmCase (t', branches)
 
-   | TmCons (t1, t2) ->
-    let t1' = eval1 ctx t1 in
-    TmCons (t1', t2)
+    (* E-Cons *)
+    | TmCons (v1, v2) when isval v1 ->
+        let t2' = eval1 ctx v2 in
+        TmCons (v1, t2')
+    | TmCons (t1, t2) ->
+        let t1' = eval1 ctx t1 in
+        TmCons (t1', t2)
 
-  | TmNil _ ->
-    raise NoRuleApplies
+    (*E-Nil*)
+    | TmNil _ ->
+        raise NoRuleApplies
+    (* E-Head *)
+    | TmHead (TmCons (v1, v2)) when isval v1 && isval v2 ->
+        v1
+    | TmHead t ->
+        let t' = eval1 ctx t in
+        TmHead t'
 
-  | TmHead (TmCons (v1, v2)) when isval v1 && isval v2 ->
-    v1
-  | TmHead t ->
-    let t' = eval1 ctx t in
-    TmHead t'
+    (* E-Tail *)
+    | TmTail (TmCons (v1, v2)) when isval v1 && isval v2 ->
+        v2
+    | TmTail t ->
+        let t' = eval1 ctx t in
+        TmTail t'
 
-  | TmTail (TmCons (v1, v2)) when isval v1 && isval v2 ->
-    v2
-  | TmTail t ->
-    let t' = eval1 ctx t in
-    TmTail t'
+    (* E-IsNil *)
+    | TmIsNil (TmNil _) ->
+        TmTrue
+    | TmIsNil (TmCons (_, _)) ->
+        TmFalse
+    | TmIsNil t ->
+        let t' = eval1 ctx t in
+        TmIsNil t'
 
-  | TmIsNil (TmNil _) ->
-    TmTrue
-  | TmIsNil (TmCons (_, _)) ->
-    TmFalse
-  | TmIsNil t ->
-    let t' = eval1 ctx t in
-    TmIsNil t'
+    (* E-Length *)
+    | TmLength (TmNil _) ->
+        TmZero
+    | TmLength (TmCons (h, t)) when isval h && isval t ->
+        TmSucc (TmLength t)
+    | TmLength t ->
+        let t' = eval1 ctx t in
+        TmLength t'
 
-  | TmVar s ->
-       getvbinding ctx s
+    (* E-Append *)
+    | TmAppend (TmNil _, v2) when isval v2 ->
+        v2
+    | TmAppend (TmCons (h, t), v2) when isval h && isval t && isval v2 ->
+        TmCons (h, TmAppend (t, v2))
+    | TmAppend (t1, t2) ->
+        let t1' = eval1 ctx t1 in
+        TmAppend (t1', t2)
+    
+    (* E-Map *)
+    | TmMap (TmAbs (x, tyx, tBody), TmNil ty) ->
+        TmNil ty
+    | TmMap (TmAbs (x, tyx, tBody), TmCons (h, t)) when isval h && isval t ->
+        TmCons (subst x h tBody, TmMap (TmAbs (x, tyx, tBody), t))
+    | TmMap (v1, t2) when isval v1 ->
+        let t2' = eval1 ctx t2 in
+        TmMap (v1, t2')
+    | TmMap (t1, t2) ->
+        let t1' = eval1 ctx t1 in
+        TmMap (t1', t2)
+      
+    (* E-Var *)
+    | TmVar s ->
+        getvbinding ctx s
 
    | _ ->
        raise NoRuleApplies

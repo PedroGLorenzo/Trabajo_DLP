@@ -19,6 +19,9 @@ rule token = parse
   | "head"      { HEAD }
   | "tail"      { TAIL }
   | "isnil"     { ISNIL }
+  | "length"    { LENGTH }
+  | "append"    { APPEND }
+  | "map"       { MAP }
   | "cons"      { CONS }
   | "let"       { LET }
   | "letrec"    { LETREC }
