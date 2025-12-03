@@ -99,6 +99,24 @@ let rec resolve_ty ctx = function
   | ty -> ty
 ;;
 
+let rec resolve_ty_full ctx ty =
+  match resolve_ty ctx ty with
+    TyArr (ty1, ty2) -> TyArr (resolve_ty_full ctx ty1, resolve_ty_full ctx ty2)
+  | TyTuple tys -> TyTuple (List.map (resolve_ty_full ctx) tys)
+  | TyList ty -> TyList (resolve_ty_full ctx ty)
+  (* dont know if the record and variant are properly named*)
+  | TyRcd flds -> TyRcd (List.map (fun (l, t) -> (l, resolve_ty_full ctx t)) flds)
+  | TyVariant flds -> TyVariant (List.map (fun (l, t) -> (l, resolve_ty_full ctx t)) flds)
+  | ty -> ty
+;;
+
+(* can also be resolved by checking if is subtype ty1 ty2 and then ty2 ty1*)
+let ty_equal ctx ty1 ty2 =
+  let rty1 = resolve_ty_full ctx ty1 in
+  let rty2 = resolve_ty_full ctx ty2 in
+  rty1 = rty2
+;;
+
 let rec typeof ctx tm = match tm with
      (* T-True *)
      TmTrue ->
