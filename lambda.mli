@@ -67,7 +67,9 @@ val getvbinding : context -> string -> term;;
 val string_of_ty : ty -> string;;
 exception Type_error of string;;
 
+(* resolve simple TyName*)
 val resolve_ty : context -> ty -> ty;;
+(* resolve full recursively all nested TyNames*)
 val resolve_ty_full : context -> ty -> ty;;
 
 val is_subtype : context -> ty -> ty -> bool;;
