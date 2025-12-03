@@ -161,15 +161,14 @@ let rec typeof ctx tm = match tm with
        let ctx' = addtbinding ctx x tyT1 in
        typeof ctx' t2
 
-     (* T-Fix *)
+      (* T-Fix *)
    | TmFix t1 ->
        let tyT1 = typeof ctx t1 in
        (match tyT1 with
             TyArr (tyT11, tyT12) ->
-              if resolve_ty ctx tyT11 = resolve_ty ctx tyT12 then resolve_ty ctx tyT12
-              else raise (Type_error "result of body not compatible with domain")
+              resolve_ty ctx tyT12
           | _ -> raise (Type_error "arrow type expected"))
-
+          
      (* T-String *)
    | TmString _ ->
        TyString
@@ -213,7 +212,6 @@ let rec typeof ctx tm = match tm with
        let tyT = typeof ctx t in
        TyVariant [(c, tyT)]
 
-     (* T-As *)
    | TmAs (t, ty) ->
        let tyT = typeof ctx t in
        let ty' = resolve_ty ctx ty in
@@ -329,8 +327,8 @@ let rec string_of_term = function
    | TmAs (t, ty) ->
        string_of_term t ^ " as " ^ string_of_ty ty
    | TmCase (t, branches) ->
-       "case " ^ string_of_term t ^ " of " ^
-       String.concat " | " (List.map (fun (c, x, body) -> "<" ^ c ^ "=" ^ x ^ "> => " ^ string_of_term body) branches)
+       "case " ^ string_of_term t ^ " of" ^
+       String.concat "| " (List.map (fun (c, x, body) -> "<" ^ c ^ "=" ^ x ^ "> => " ^ string_of_term body) branches)
   | TmNil _ ->
     "[]"
   | TmCons (t1, t2) ->
@@ -631,7 +629,6 @@ let rec eval1 ctx tm = match tm with
        let t' = eval1 ctx t in
        TmVariant (c, t')
 
-     (* E-As *)
    | TmAs (TmVariant (c, v), ty) when isval v ->
        TmVariant (c, v)
 
@@ -639,12 +636,13 @@ let rec eval1 ctx tm = match tm with
        let t' = eval1 ctx t in
        TmAs (t', ty)
 
-     (* E-Case *)
+     (* E-CaseVariant *)
    | TmCase (TmVariant (c, v), branches) when isval v ->
        (try let (_, x, body) = List.find (fun (c', _, _) -> c' = c) branches in
             subst x v body
         with Not_found -> raise NoRuleApplies)
 
+      (*E-Case*)
    | TmCase (t, branches) ->
        let t' = eval1 ctx t in
        TmCase (t', branches)
