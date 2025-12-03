@@ -66,6 +66,15 @@ val getvbinding : context -> string -> term;;
 
 val string_of_ty : ty -> string;;
 exception Type_error of string;;
+
+val resolve_ty : context -> ty -> ty;;
+val resolve_ty_full : context -> ty -> ty;;
+
+val is_subtype : context -> ty -> ty -> bool;;
+val ty_equal : context -> ty -> ty -> bool;;
+
+val ty_join : context -> ty -> ty -> ty;;
+
 val typeof : context -> term -> ty;;
 
 val string_of_term : term -> string;;
