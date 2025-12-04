@@ -111,6 +111,7 @@ let rec resolve_ty_full ctx ty =
 ;;
 
 let is_subtype ctx ty1 ty2 =
+  (*get the normalized return types(full)*)
   let rtn1 = resolve_ty_full ctx ty1 in
   let rtn2 = resolve_ty_full ctx ty2 in
   match rtn1, rtn2 with
@@ -149,10 +150,43 @@ let is_subtype ctx ty1 ty2 =
 
 (* can also be resolved by checking if is subtype ty1 ty2 and then ty2 ty1*)
 let ty_equal ctx ty1 ty2 =
-  let rty1 = resolve_ty_full ctx ty1 in
-  let rty2 = resolve_ty_full ctx ty2 in
-  rty1 = rty2
+  (*check if resolved normalized types are equal*)
+  let rtn1 = resolve_ty_full ctx ty1 in
+  let rtn2 = resolve_ty_full ctx ty2 in
+  rtn1 = rtn2
 ;;
+
+
+let ty_join ctx ty1 ty2 =
+  (*get return normalized types*)
+  let rtn1 = resolve_ty_full ctx ty1 in
+  let rtn2 = resolve_ty_full ctx ty2 in
+  match rtn1, rtn2 with
+    _, _ when rtn1 = rtn2 -> rtn1
+  | _, _ when is_subtype ctx rtn1 rtn2 -> rtn2
+  | _, _ when is_subtype ctx rtn2 rtn1 -> rtn1
+  (*Arrs*)
+  | TyArr (t1, rt1), TyArr (t2, rt2) ->
+      TyArr (ty_join ctx t1 t2, ty_join ctx rt1 rt2)
+  (*Tuples*)
+  | TyTuple tys1, TyTuple tys2 ->
+      if List.length tys1 = List.length tys2 then
+        TyTuple (List.map2 (ty_join ctx) tys1 tys2)
+      else
+        raise (Type_error "tuples lenght mismatch in join")
+  (*Lists*)
+  | TyList t1, TyList t2 ->
+      TyList (ty_join ctx t1 t2)
+  (*Records*)
+  | TyRcd fields1, TyRcd fields2 ->
+    fields1
+    (*Variants*)
+  | TyVariant fields1, TyVariant fields2 ->
+    fields1
+  | _ ->
+      raise (Type_error "No supertype in common")
+  ;;
+
 
 let rec typeof ctx tm = match tm with
      (* T-True *)
