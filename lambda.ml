@@ -105,10 +105,48 @@ let rec resolve_ty_full ctx ty =
   | TyTuple tys -> TyTuple (List.map (resolve_ty_full ctx) tys)
   | TyList ty -> TyList (resolve_ty_full ctx ty)
   (* dont know if the record and variant are properly named*)
-  | TyRcd flds -> TyRcd (List.map (fun (l, t) -> (l, resolve_ty_full ctx t)) flds)
-  | TyVariant flds -> TyVariant (List.map (fun (l, t) -> (l, resolve_ty_full ctx t)) flds)
+  | TyRcd fields -> TyRcd (List.map (fun (l, t) -> (l, resolve_ty_full ctx t)) fields)
+  | TyVariant fields -> TyVariant (List.map (fun (l, t) -> (l, resolve_ty_full ctx t)) fields)
   | ty -> ty
 ;;
+
+let is_subtype ctx ty1 ty2 =
+  let rtn1 = resolve_ty_full ctx ty1 in
+  let rtn2 = resolve_ty_full ctx ty2 in
+  match rtn1, rtn2 with
+    (*Exact matching & explicit nat,bool, str*)
+    _, _ when rtn1 = rtn2 -> 
+      true
+    (*Array*)
+  | TyArr (t1, rt1), TyArr (t2, rt2) ->
+      is_subtype ctx t2 t1 && is_subtype ctx rt1 rt2 (*check later*)
+    (*Tuple*)
+  | TyTuple tys1, TyTuple tys2 ->
+      List.length tys1 = List.length tys2 &&
+      List.for_all2 (is_subtype ctx) tys1 tys2 (*check subtype on all elem*)
+    (*List*)
+  | TyList t1, TyList t2 ->
+      is_subtype ctx t1 t2
+    (*Variant*)
+  | TyVariant fields1, TyVariant fields2 ->
+      List.for_all (fun (lbl2, t2) ->
+        match List.assoc_opt lbl2 fields1 with
+        | Some t1 -> is_subtype ctx t1 t2 
+        | None -> false
+      ) fields2
+    (*Record*)
+  | TyRcd fields1, TyRcd fields2 ->
+      List.for_all (fun (lbl2, t2) ->
+        try
+          let t1 = List.assoc lbl2 fields1 in (*find l2 in fields1*)
+          ty_equal ctx t1 t2                (*check type for returned in assoc*)
+        with Not_found -> false
+      ) fields2
+    (*Return false if not a subtype*)
+  | _ -> 
+    false
+;;
+
 
 (* can also be resolved by checking if is subtype ty1 ty2 and then ty2 ty1*)
 let ty_equal ctx ty1 ty2 =
@@ -736,7 +774,7 @@ let rec eval1 ctx tm = match tm with
     | TmLength (TmNil _) ->
         TmZero
     | TmLength (TmCons (h, t)) when isval h && isval t ->
-        TmSucc (TmLength t)
+        TmSucc (TmLength t) (*loop applying successor rec*)
     | TmLength t ->
         let t' = eval1 ctx t in
         TmLength t'
@@ -745,7 +783,7 @@ let rec eval1 ctx tm = match tm with
     | TmAppend (TmNil _, v2) when isval v2 ->
         v2
     | TmAppend (TmCons (h, t), v2) when isval h && isval t && isval v2 ->
-        TmCons (h, TmAppend (t, v2))
+        TmCons (h, TmAppend (t, v2)) (*append loop with h of t and v2 as new tail*)
     | TmAppend (t1, t2) ->
         let t1' = eval1 ctx t1 in
         TmAppend (t1', t2)
