@@ -93,10 +93,24 @@ letrec add : Int -> Int -> Int =
                     i2
                 else
                     add <neg=succ n1> as Int <neg=pred n2> as Int
-in add <pos=1> as Int <pos=2> as Int;; 
+in add <pos=1> as Int <neg=2> as Int;; 
 
 
 
 add p3 p3
 add p3 n2
 add n2 p3
+
+Person = {name:String}
+Employee = {bol:Bool, name:String, salary:Nat}
+e : Employee = {bol=true, name="Alice", salary=50000}
+get_name = lambda p:Person. p.name
+get_name e
+
+SmallInt = <pos:Nat>
+Int = <zero:Bool, pos:Nat, neg:Nat>
+p = <pos=3> as SmallInt
+get_pos = lambda i:SmallInt. case i of <pos=p> => p
+get_pos p
+get_pos (<pos=5> as Int)
+

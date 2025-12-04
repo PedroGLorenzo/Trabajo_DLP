@@ -64,14 +64,16 @@
 %%
 
 s :
-     IDV EQ ty EOF
-       { TypeBind ($1, $3) }
-   | IDV EQ term EOF
-       { Bind ($1, $3) }
-   | term EOF
-       { Eval $1 }
-   | QUIT EOF
-       { Quit }
+      IDV EQ ty EOF
+        { TypeBind ($1, $3) }
+    | IDV COLON ty EQ term EOF
+        { Bind ($1, Some $3, $5) }
+    | IDV EQ term EOF
+        { Bind ($1, None, $3) }
+    | term EOF
+        { Eval $1 }
+    | QUIT EOF
+        { Quit }
 
 term :
          appTerm
@@ -153,20 +155,22 @@ ty :
             { TyArr ($1, $3) }
 
 atomicTy :
-         LPAREN ty RPAREN
-             { $2 }
-    |   BOOL
-             { TyBool }
-    |   NAT
-             { TyNat }
-    |   STRING
-             { TyString }
-    |   LBRACKET ty RBRACKET
-            { TyList $2 }
-    |   LANGLE fieldlist_ty RANGLE
-             { TyVariant $2 }
-    |   IDV
-             { TyName $1 }
+          LPAREN ty RPAREN
+              { $2 }
+     |   BOOL
+              { TyBool }
+     |   NAT
+              { TyNat }
+     |   STRING
+              { TyString }
+     |   LBRACKET ty RBRACKET
+             { TyList $2 }
+     |   LBRACE fieldlist_ty RBRACE
+              { TyRcd $2 }
+     |   LANGLE fieldlist_ty RANGLE
+              { TyVariant $2 }
+     |   IDV
+              { TyName $1 }
 
 termtuple :
         term

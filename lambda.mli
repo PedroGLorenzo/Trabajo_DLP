@@ -44,7 +44,7 @@ type term =
 
 type command =
      Eval of term
-   | Bind of string * term
+   | Bind of string * ty option * term
    | TypeBind of string * ty
    | Quit
 ;;

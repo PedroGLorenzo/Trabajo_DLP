@@ -55,7 +55,7 @@ rule token = parse
   | ';'         { SEMICOLON }
   | ','         { COMMA }
   | ['0'-'9']+  { INTV (int_of_string (Lexing.lexeme lexbuf)) }
-  | ['A'-'Z''a'-'z']['a'-'z' '_' '0'-'9']*
+  | ['A'-'Z''a'-'z']['A'-'Z''a'-'z' '_' '0'-'9']*
                 { IDV (Lexing.lexeme lexbuf) }
   | eof         { EOF }
   | _           { raise Lexical_error }

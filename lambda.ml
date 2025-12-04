@@ -45,10 +45,10 @@ type term =
 ;;
 
 type command =
-     Eval of term
-   | Bind of string * term
-   | TypeBind of string * ty
-   | Quit
+      Eval of term
+    | Bind of string * ty option * term  (* name, optional type annotation, term *)
+    | TypeBind of string * ty
+    | Quit
 ;;
 
 type binding =
@@ -110,7 +110,7 @@ let rec resolve_ty_full ctx ty =
   | ty -> ty
 ;;
 
-let is_subtype ctx ty1 ty2 =
+let rec is_subtype ctx ty1 ty2 =
   (*get the normalized return types(full)*)
   let rtn1 = resolve_ty_full ctx ty1 in
   let rtn2 = resolve_ty_full ctx ty2 in
@@ -157,7 +157,7 @@ let ty_equal ctx ty1 ty2 =
 ;;
 
 
-let ty_join ctx ty1 ty2 =
+let rec ty_join ctx ty1 ty2 =
   (*get return normalized types*)
   let rtn1 = resolve_ty_full ctx ty1 in
   let rtn2 = resolve_ty_full ctx ty2 in
@@ -259,7 +259,7 @@ let rec typeof ctx tm = match tm with
        let tyT2 = typeof ctx t2 in
        (match tyT1 with
             TyArr (tyT11, tyT12) ->
-              if resolve_ty ctx tyT2 = resolve_ty ctx tyT11 then tyT12
+              if is_subtype ctx tyT2 tyT11 then tyT12
               else raise (Type_error "parameter type mismatch")
           | _ -> raise (Type_error "arrow type expected"))
 
@@ -299,7 +299,7 @@ let rec typeof ctx tm = match tm with
 
      (* T-Proj *)
    | TmProj (t, i) ->
-       let tyT = typeof ctx t in
+       let tyT = resolve_ty_full ctx (typeof ctx t) in
        (match tyT with
           TyTuple tys ->
             if i >= 1 && i <= List.length tys then List.nth tys (i-1)
@@ -308,7 +308,7 @@ let rec typeof ctx tm = match tm with
 
      (* T-ProjRcd *)
    | TmProjRcd (t, l) ->
-       let tyT = typeof ctx t in
+       let tyT = resolve_ty_full ctx (typeof ctx t) in
        (match tyT with
           TyRcd fields ->
             (try List.assoc l fields with
@@ -325,7 +325,7 @@ let rec typeof ctx tm = match tm with
        let ty' = resolve_ty ctx ty in
        (match tyT, ty' with
           TyVariant [(c, tyV)], TyVariant fields ->
-            if List.mem_assoc c fields && List.assoc c fields = tyV then ty'
+            if List.mem_assoc c fields && is_subtype ctx tyV (List.assoc c fields) then ty'
             else raise (Type_error ("variant " ^ c ^ " not compatible with type"))
         | _ -> raise (Type_error "as expects variant and variant type"))
 
@@ -876,8 +876,15 @@ let execute ctx = function
        print_endline ("- : " ^ string_of_term tm' ^ " : " ^ string_of_ty tyTm);
        ctx
 
-   | Bind (s, tm) ->
+   | Bind (s, ty_opt, tm) ->
        let tyTm = typeof ctx tm in
+       (match ty_opt with
+        | Some ty ->
+            if not (ty_equal ctx tyTm ty) then
+              raise (Type_error ("type mismatch in binding: expected " ^ string_of_ty ty ^ ", got " ^ string_of_ty tyTm))
+            else ()
+        | None -> ()
+       );
        let tm' = eval ctx tm in
        print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
        addvbinding ctx s tyTm tm'
