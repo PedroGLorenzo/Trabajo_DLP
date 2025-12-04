@@ -130,15 +130,15 @@ let is_subtype ctx ty1 ty2 =
     (*Variant*)
   | TyVariant fields1, TyVariant fields2 ->
       List.for_all (fun (lbl2, t2) ->
-        match List.assoc_opt lbl2 fields1 with
-        | Some t1 -> is_subtype ctx t1 t2 
+        match List.assoc_opt lbl2 fields1 with  (*check if label from 2nd variant is on fields1*)
+        | Some t1 -> is_subtype ctx t1 t2       (*Subtype next depth iteration*)
         | None -> false
       ) fields2
     (*Record*)
   | TyRcd fields1, TyRcd fields2 ->
       List.for_all (fun (lbl2, t2) ->
-        match List.assoc_opt lbl2 fields1 with
-        | Some t1 -> is_subtype ctx t1 t2 
+        match List.assoc_opt lbl2 fields1 with  (*check if label from 2nd record is on fields1*)
+        | Some t1 -> is_subtype ctx t1 t2       (*Subtype next depth iteration*)
         | None -> false
       ) fields2
     (*Return false if not a subtype*)
