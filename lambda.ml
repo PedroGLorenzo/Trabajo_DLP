@@ -130,15 +130,15 @@ let is_subtype ctx ty1 ty2 =
       is_subtype ctx t1 t2
     (*Variant*)
   | TyVariant fields1, TyVariant fields2 ->
-      List.for_all (fun (lbl2, t2) ->
-        match List.assoc_opt lbl2 fields1 with  (*check if label from 2nd variant is on fields1*)
-        | Some t1 -> is_subtype ctx t1 t2       (*Subtype next depth iteration*)
+      List.for_all (fun (ct2, p2) ->
+        match List.assoc_opt ct2 fields1 with  (*check if label from 2nd variant is on fields1*)
+        | Some p1 -> is_subtype ctx p1 p2       (*Subtype next depth iteration*)
         | None -> false
       ) fields2
     (*Record*)
   | TyRcd fields1, TyRcd fields2 ->
-      List.for_all (fun (lbl2, t2) ->
-        match List.assoc_opt lbl2 fields1 with  (*check if label from 2nd record is on fields1*)
+      List.for_all (fun (l2, t2) ->
+        match List.assoc_opt l2 fields1 with  (*check if label from 2nd record is on fields1*)
         | Some t1 -> is_subtype ctx t1 t2       (*Subtype next depth iteration*)
         | None -> false
       ) fields2
@@ -179,10 +179,24 @@ let ty_join ctx ty1 ty2 =
       TyList (ty_join ctx t1 t2)
   (*Records*)
   | TyRcd fields1, TyRcd fields2 ->
-    fields1
+    (*intersection of labels*)
+    let tys_intersect = 
+      List filter_map (fun (l1, t1) ->
+        match List.assoc_opt l1 fields2 with
+        | Some t2 -> Some (l1, ty_join ctx t1 t2)
+        | None -> None
+      ) fields1
+    in TyRcd tys_intersect
     (*Variants*)
   | TyVariant fields1, TyVariant fields2 ->
-    fields1
+    (*intersection of tags*)
+    let tys_intersect =
+      List.filter_map (fun (ct1, p1) ->
+        match List.assoc_opt ct1 fields2 with
+        | Some p2 -> Some (ct1, ty_join ctx p1 p2)
+        | None -> None
+      ) fields1
+    in TyVariant tys_intersect
   | _ ->
       raise (Type_error "No supertype in common")
   ;;
