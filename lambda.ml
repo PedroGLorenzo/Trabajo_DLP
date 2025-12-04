@@ -181,7 +181,7 @@ let ty_join ctx ty1 ty2 =
   | TyRcd fields1, TyRcd fields2 ->
     (*intersection of labels*)
     let tys_intersect = 
-      List filter_map (fun (l1, t1) ->
+      List.filter_map (fun (l1, t1) ->
         match List.assoc_opt l1 fields2 with
         | Some t2 -> Some (l1, ty_join ctx t1 t2)
         | None -> None
@@ -196,7 +196,9 @@ let ty_join ctx ty1 ty2 =
         | Some p2 -> Some (ct1, ty_join ctx p1 p2)
         | None -> None
       ) fields1
-    in TyVariant tys_intersect
+    in 
+    if tys_intersect = [] then raise(Type_error "No supertype in common for variants")
+    else TyVariant tys_intersect
   | _ ->
       raise (Type_error "No supertype in common")
   ;;
