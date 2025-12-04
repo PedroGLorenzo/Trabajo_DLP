@@ -137,10 +137,9 @@ let is_subtype ctx ty1 ty2 =
     (*Record*)
   | TyRcd fields1, TyRcd fields2 ->
       List.for_all (fun (lbl2, t2) ->
-        try
-          let t1 = List.assoc lbl2 fields1 in (*find l2 in fields1*)
-          ty_equal ctx t1 t2                (*check type for returned in assoc*)
-        with Not_found -> false
+        match List.assoc_opt lbl2 fields1 with
+        | Some t1 -> is_subtype ctx t1 t2 
+        | None -> false
       ) fields2
     (*Return false if not a subtype*)
   | _ -> 
