@@ -110,7 +110,7 @@ let rec resolve_ty_full ctx ty =
   | ty -> ty
 ;;
 
-let is_subtype ctx ty1 ty2 =
+let rec is_subtype ctx ty1 ty2 =
   (*get the normalized return types(full)*)
   let rtn1 = resolve_ty_full ctx ty1 in
   let rtn2 = resolve_ty_full ctx ty2 in
@@ -157,7 +157,7 @@ let ty_equal ctx ty1 ty2 =
 ;;
 
 
-let ty_join ctx ty1 ty2 =
+let rec ty_join ctx ty1 ty2 =
   (*get return normalized types*)
   let rtn1 = resolve_ty_full ctx ty1 in
   let rtn2 = resolve_ty_full ctx ty2 in
@@ -336,21 +336,26 @@ let rec typeof ctx tm = match tm with
           TyVariant fields ->
             let rec check_branches = function
                 [] -> raise (Type_error "case must have branches")
-              | [(c, x, body)] ->
-                  (try let tyC = List.assoc c fields in
-                       let ctx' = addtbinding ctx x tyC in
-                       resolve_ty ctx (typeof ctx' body)
-                   with Not_found -> raise (Type_error ("unknown constructor " ^ c)))
-              | (c, x, body)::rest ->
-                  (try let tyC = List.assoc c fields in
+              | [(c, x, body)] -> (
+                try 
+                  let tyC = List.assoc c fields in
+                  let ctx' = addtbinding ctx x tyC in
+                  resolve_ty ctx (typeof ctx' body)
+                  with Not_found -> 
+                    raise (Type_error ("unknown constructor " ^ c)))
+              | (c, x, body)::rest -> (
+                    try
+                       let tyC = List.assoc c fields in
                        let ctx' = addtbinding ctx x tyC in
                        let tyBody = resolve_ty ctx (typeof ctx' body) in
                        let tyRest = check_branches rest in
                        if tyBody = tyRest then tyBody
                        else raise (Type_error "case branches have different types")
-                   with Not_found -> raise (Type_error ("unknown constructor " ^ c)))
+                   with Not_found ->
+                     raise (Type_error ("unknown constructor " ^ c)))
             in check_branches branches
-        | _ -> raise (Type_error "case of non-variant"))
+          | _ -> 
+            raise (Type_error "case of non-variant"))
 
   
   (* T-Cons *)
@@ -776,10 +781,13 @@ let rec eval1 ctx tm = match tm with
 
      (* E-CaseVariant *)
     | TmCase (TmVariant (c, v), branches) when isval v ->
-       (try let (_, x, body) = List.find (fun (c', _, _) -> c' = c) branches in
-            subst x v body
-        with Not_found -> raise NoRuleApplies)
-
+      let rec pick = function
+        | [] -> raise (Type_error ("case: constructor "^c^" has no branch"))
+        | (c', x, body) :: rest ->
+            if c' = c then subst x v body else pick rest
+      in
+      pick branches
+      
        (*E-Case*)
    | TmCase (t, branches) ->
        let t' = eval1 ctx t in
