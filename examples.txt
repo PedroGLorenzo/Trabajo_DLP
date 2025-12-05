@@ -26,6 +26,10 @@ letrec sum: Nat -> Nat -> Nat =
             succ( sum( pred n) m)
 in sum 21 34
 
+s1 = "hello"
+s2 = " world"
+s1^s2
+
 t = {true, 0, "hello"}
 t.1
 t.2
