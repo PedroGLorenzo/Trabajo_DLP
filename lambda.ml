@@ -331,31 +331,21 @@ let rec typeof ctx tm = match tm with
 
      (* T-Case *)
    | TmCase (t, branches) ->
-       let tyT = resolve_ty ctx (typeof ctx t) in
-       (match tyT with
+        let tyT = resolve_ty_full ctx (typeof ctx t) in
+        (match tyT with
           TyVariant fields ->
-            let rec check_branches = function
-                [] -> raise (Type_error "case must have branches")
-              | [(c, x, body)] -> (
-                try 
-                  let tyC = List.assoc c fields in
-                  let ctx' = addtbinding ctx x tyC in
-                  resolve_ty ctx (typeof ctx' body)
-                  with Not_found -> 
-                    raise (Type_error ("unknown constructor " ^ c)))
-              | (c, x, body)::rest -> (
-                    try
-                       let tyC = List.assoc c fields in
-                       let ctx' = addtbinding ctx x tyC in
-                       let tyBody = resolve_ty ctx (typeof ctx' body) in
-                       let tyRest = check_branches rest in
-                       if tyBody = tyRest then tyBody
-                       else raise (Type_error "case branches have different types")
-                   with Not_found ->
-                     raise (Type_error ("unknown constructor " ^ c)))
-            in check_branches branches
-          | _ -> 
-            raise (Type_error "case of non-variant"))
+           let branch_tys = List.map (fun (c, x, body) ->
+            match List.assoc_opt c fields with
+            | Some ty ->
+               let ctx' = addtbinding ctx x ty in
+               typeof ctx' body
+            | None ->
+               raise (Type_error ("constructor " ^ c ^ " not found in variant"))
+           ) branches in
+           (match branch_tys with
+            | [] -> raise (Type_error "case has no branches")
+            | ty0 :: rest -> List.fold_left (fun acc ty -> ty_join ctx acc ty) ty0 rest)
+        | _ -> raise (Type_error "case expects a variant type"))
 
   
   (* T-Cons *)
