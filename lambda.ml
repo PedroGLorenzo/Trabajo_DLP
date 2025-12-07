@@ -115,10 +115,10 @@ let rec is_subtype ctx ty1 ty2 =
   let rtn1 = resolve_ty_full ctx ty1 in
   let rtn2 = resolve_ty_full ctx ty2 in
   match rtn1, rtn2 with
-    (*Exact matching & explicit nat,bool, str*)
+    (*Exact matching & explicit*)
     _, _ when rtn1 = rtn2 -> 
       true
-    (*Array*)
+    (*Arrow*)
   | TyArr (t1, rt1), TyArr (t2, rt2) ->
       is_subtype ctx t2 t1 && is_subtype ctx rt1 rt2 (*check later*)
     (*Tuple*)
@@ -165,7 +165,7 @@ let rec ty_join ctx ty1 ty2 =
     _, _ when rtn1 = rtn2 -> rtn1
   | _, _ when is_subtype ctx rtn1 rtn2 -> rtn2
   | _, _ when is_subtype ctx rtn2 rtn1 -> rtn1
-  (*Arrs*)
+  (*Arrows*)
   | TyArr (t1, rt1), TyArr (t2, rt2) ->
       TyArr (ty_join ctx t1 t2, ty_join ctx rt1 rt2)
   (*Tuples*)
