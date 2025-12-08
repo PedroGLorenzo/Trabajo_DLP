@@ -31,20 +31,23 @@ let top_level_loop () =
   print_endline "Evaluator of lambda expressions...";
   let rec loop ctx =
     try
-      let c = s token (from_string (read_command ())) in 
+      let c = s token (from_string (read_command ())) in
       loop (execute ctx c)
     with
-       Lexical_error ->
-         print_endline "lexical error";
-         loop ctx
-     | Parse_error ->
-         print_endline "syntax error";
-         loop ctx
-     | Type_error e ->
-         print_endline ("type error: " ^ e);
-         loop ctx
-     | End_of_file ->
-         print_endline "...bye!!!"
+        Lexical_error ->
+          print_endline "lexical error";
+          loop ctx
+      | Parse_error ->
+          print_endline "syntax error";
+          loop ctx
+      | Type_error e ->
+          print_endline ("type error: " ^ e);
+          loop ctx
+      | Not_found ->
+          print_endline "unbound variable";
+          loop ctx
+      | End_of_file ->
+          print_endline "...bye!!!"
   in
     loop emptyctx
   ;;
